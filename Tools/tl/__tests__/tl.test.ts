@@ -249,6 +249,61 @@ describe("tl read", () => {
   });
 });
 
+describe("tl replace end to end", () => {
+  const Doc = "`activeItems` and pendingItems, plus activeItemsCount\n";
+
+  it("previews without writing, and writes only with --take", () => {
+    const relative = writeFixture("rename.md", Doc);
+    const spec = ["replace", "activeItems", "liveItems", "--word", "--", relative];
+
+    const preview = runCli(spec);
+    expect(preview.status).toBe(0);
+    expect(preview.output).toContain("preview only");
+    expect(readFixture("rename.md")).toBe(Doc);
+
+    const written = runCli([...spec, "--take"]);
+    expect(written.status).toBe(0);
+    expect(readFixture("rename.md")).toBe("`liveItems` and pendingItems, plus activeItemsCount\n");
+    const backupLine = written.output.split("\n").find((line) => line.includes("pre-image:"));
+    expect(readFileSync(backupLine?.split("pre-image:")[1].trim() ?? "", "utf8")).toBe(Doc);
+  });
+
+  it("applies several rules across several files in one call", () => {
+    writeFixture("multi-a.md", "activeItems\n");
+    writeFixture("multi-b.md", "pendingItems\n");
+    const result = runCli([
+      "replace", "activeItems", "liveItems", "pendingItems", "staleItems",
+      "--word", "--take", "--", "Tools/tl/__fixtures__/multi-*.md",
+    ]);
+    expect(result.status).toBe(0);
+    expect(readFixture("multi-a.md")).toBe("liveItems\n");
+    expect(readFixture("multi-b.md")).toBe("staleItems\n");
+    expect(result.output).toContain("2 file(s) written");
+  });
+
+  it("refuses an odd number of positionals rather than guessing the pairing", () => {
+    const relative = writeFixture("odd.md", Doc);
+    const result = runCli(["replace", "a", "b", "c", "--take", "--", relative]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("pairs; got 3");
+    expect(readFixture("odd.md")).toBe(Doc);
+  });
+
+  it("refuses to write when a matched file is protected, without touching the others", () => {
+    const relative = writeFixture("safe.md", Doc);
+    const result = runCli(["replace", "activeItems", "x", "--take", "--", relative, ".claude"]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("protected path");
+    expect(readFixture("safe.md")).toBe(Doc);
+  });
+
+  it("refuses to run inside batch, because it writes", () => {
+    const result = runCli(["batch", "replace a b --take -- Tools/tl/__fixtures__"]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("may not run inside batch");
+  });
+});
+
 describe("tl dispatch", () => {
   it("reports usage and exit 2 for an unknown verb", () => {
     const result = runCli(["bogus"]);

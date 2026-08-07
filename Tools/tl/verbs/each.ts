@@ -4,25 +4,18 @@ import path from 'node:path';
 import type { ParsedArgs } from '../lib/argv';
 import { Limits } from '../lib/constants';
 import { resolveEachRequest, summariseFile } from '../lib/eachPlan';
-import { assertSafePathspecs } from '../lib/gitArgs';
+import { listRepoFiles } from '../lib/fileList';
 import { capLines } from '../lib/outputShaping';
 import { repoRoot } from '../lib/paths';
-import { gitLines } from '../lib/run';
 import { ok, type VerbResult } from '../lib/verb';
-
-function matchingFiles(pathspecs: readonly string[]): string[] {
-  const safe = assertSafePathspecs(pathspecs);
-  if (safe.length === 0) throw new Error('usage: tl each <pathspec...> --<mode>');
-  return gitLines(['ls-files', '--cached', '--others', '--exclude-standard', '--', ...safe]);
-}
 
 export function each(args: ParsedArgs): VerbResult {
   const request = resolveEachRequest(args.flags, args.options);
-  const files = matchingFiles([...args.positional, ...args.paths]);
+  const files = listRepoFiles([...args.positional, ...args.paths], {
+    usage: 'usage: tl each <pathspec...> --<mode>',
+    cap: Limits.EachMaxFiles,
+  });
   if (files.length === 0) return ok(['no files match that pathspec']);
-  if (files.length > Limits.EachMaxFiles) {
-    throw new Error(`${files.length} files match; the cap is ${Limits.EachMaxFiles} — narrow the pathspec`);
-  }
   const lines: string[] = [];
   for (const relativePath of files) {
     const contents = readFileSync(path.resolve(repoRoot(), relativePath), 'utf8');

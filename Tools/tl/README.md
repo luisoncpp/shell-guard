@@ -55,8 +55,8 @@ the quality of the code; do not chase it to zero.
 
 | Layer | Files | Coverage |
 |-------|-------|----------|
-| Pure rules | `lib/argv.ts`, `lib/batchPlan.ts`, `lib/conflictResolver.ts`, `lib/constants.ts`, `lib/diffCounting.ts`, `lib/eachPlan.ts`, `lib/fallowReport.ts`, `lib/gatePlan.ts`, `lib/gitArgs.ts`, `lib/grepQuery.ts`, `lib/lines.ts`, `lib/outputShaping.ts`, `lib/redaction.ts`, `lib/sectionSlice.ts`, `lib/usage.ts`, `lib/verb.ts` | ~100% in-process |
-| IO | `lib/run.ts`, `lib/paths.ts`, `lib/writeGuard.ts`, `verbs/*.ts`, `index.ts` | subprocess only (uncredited) |
+| Pure rules | `lib/argv.ts`, `lib/batchPlan.ts`, `lib/conflictResolver.ts`, `lib/constants.ts`, `lib/diffCounting.ts`, `lib/eachPlan.ts`, `lib/fallowReport.ts`, `lib/gatePlan.ts`, `lib/gitArgs.ts`, `lib/grepQuery.ts`, `lib/lines.ts`, `lib/outputShaping.ts`, `lib/redaction.ts`, `lib/replacePlan.ts`, `lib/sectionSlice.ts`, `lib/usage.ts`, `lib/verb.ts` | ~100% in-process |
+| IO | `lib/run.ts`, `lib/paths.ts`, `lib/fileList.ts`, `lib/writeGuard.ts`, `verbs/*.ts`, `index.ts` | subprocess only (uncredited) |
 
 **A new rule belongs in a pure module.** Putting it in a verb costs coverage,
 testability, and a complexity finding.
@@ -76,6 +76,7 @@ Paths are relative to this directory.
 | `lib/grepQuery.ts` | **Pure.** `git grep` argument construction (pattern behind `-e`), output reduction |
 | `lib/eachPlan.ts` | **Pure.** `resolveEachRequest` (one mode only), `summariseFile` |
 | `lib/gatePlan.ts` | **Pure.** The `Gate` shape, `RootGates`, `assertWorkspaceName` (shell-safe directory grammar), `workspaceGates` (the fixed per-workspace gate template) |
+| `lib/replacePlan.ts` | **Pure.** `parseRules` (positional pairs), `buildMatcher` (literal escaping, word boundaries, regex), `applyRules` per line with terminators preserved |
 | `lib/lines.ts` | **Pure.** `splitLines` on `/\r?\n/` — see the CRLF invariant below |
 | `lib/redaction.ts` | **Pure.** `redactLine`: connection-string passwords + secret-looking assignment values |
 | `lib/sectionSlice.ts` | **Pure.** `sliceSection`, inclusive of both boundaries like `sed -n '/a/,/b/p'` |
@@ -95,7 +96,9 @@ Paths are relative to this directory.
 | `verbs/history.ts` | `--file` provenance, `--commits` per-commit breakdown, `--find` across all refs; also `show` |
 | `verbs/status.ts` | Branch line + porcelain + conflicted count |
 | `verbs/grep.ts` | `git grep` wrapper; no matches is exit 0, not exit 1 |
-| `verbs/each.ts` | Resolves a pathspec via `git ls-files`, applies one `eachPlan` mode per file |
+| `verbs/each.ts` | Applies one `eachPlan` mode to every file `fileList` returns |
+| `verbs/replace.ts` | Preview-by-default substitution across a pathspec; `--take` writes through `writeGuard` |
+| `lib/fileList.ts` | `listRepoFiles`: pathspec → file list via `git ls-files`, with a caller-supplied cap. Shared by `each` and `replace` |
 | `verbs/read.ts` | `read` (optionally redacted) and `section`, both confined to the repo |
 | `verbs/conflicts.ts` | Conflict listing, hunk display, `--audit`, `--take` orchestration |
 | `tl`, `tl.cmd` | PATH shims; run `index.ts` through the vendored `tsx`, resolved from the script's own directory rather than the cwd |
@@ -103,7 +106,7 @@ Paths are relative to this directory.
 
 Tests: one in-process suite per pure module
 (`argv`, `batchPlan`, `conflictResolver`, `diffCounting`, `eachPlan`, `fallowReport`,
-`gatePlan`, `gitArgs`, `grepQuery`, `outputShaping`, `redaction`, `sectionSlice`,
+`gatePlan`, `gitArgs`, `grepQuery`, `outputShaping`, `redaction`, `replacePlan`, `sectionSlice`,
 `writeGuard`),
 plus `__tests__/tl.test.ts` — subprocess through the same vendored `tsx`, for end-to-end
 wiring and the guards only.
@@ -147,6 +150,30 @@ language rather than a fixed list of pre-approved verbs.
    `TL_TMP/backups/<iso-stamp>__<flattened-path>`, then writes.
 8. Surviving marker count becomes the exit code (non-zero if any remain).
 
+## Data flow — `replace <from> <to> ... -- <pathspec...>`
+
+The verb that retires `sed -i 's/a/b/g' f1 f2 f3` — a shape no `permissions.allow`
+entry can name, so it prompted on every rename.
+
+1. `index.ts` parses argv. Rules are the positionals; pathspecs are whatever follows
+   the literal `--`, and a call with no `--` is a usage error rather than a guess.
+2. `parseRules` pairs the positionals — odd count refused, `from === to` refused,
+   empty `from` refused, cap of `Limits.ReplaceMaxRules`.
+3. `resolveReplaceMode` picks `literal` (default), `word`, or `regex`; both flags at
+   once is an error, not a precedence rule.
+4. `listRepoFiles` expands the pathspec through `git ls-files --cached --others
+   --exclude-standard`, so `.gitignore` keeps `node_modules` out of a glob for free.
+5. **With `--take`, `assertWritable` runs for every matched file before any file is
+   read or written** — see the all-or-nothing invariant below.
+6. Each file is read as a Buffer; one containing a NUL byte is counted as skipped
+   rather than decoded as UTF-8 and written back as mojibake.
+7. `applyRules` rewrites line by line, rules in order, and reports both a per-rule
+   match count and the before/after of each changed line.
+8. Unchanged files are never written, so no pointless pre-image lands in the backup
+   directory.
+9. Without `--take` the changed lines print as a diff-ish preview and nothing is
+   written. With it, `writeRepoFile` takes a pre-image per file and writes.
+
 ## Invariants
 
 - **Verbs return `VerbResult`; they never print.** Printing and shaping belong to
@@ -185,6 +212,23 @@ language rather than a fixed list of pre-approved verbs.
   regex, where `a|b` and `x+` are literals — an alternation pattern silently returns
   "no matches" instead of erroring. Extended is what a caller typing a regex expects,
   and it matches the JS syntax used by every `--grep=` shaping option.
+- **`--take` is the only write flag, on every verb that writes.** `replace` previews by
+  default and writes only with `--take`, rather than inventing a `--dry-run` that would
+  make writing the default. Two consequences fall out for free: `batchPlan`'s existing
+  `--take` denial already covers `replace`, so a preview may run in a batch and a
+  rewrite may not; and a new writing verb inherits both behaviours by reusing the flag.
+- **`replace --take` asserts writability for *every* matched file before the first
+  write.** A pathspec sweeping in one protected file must fail the whole call — a
+  per-file check would rewrite the first half of the match set and then refuse, leaving
+  the tree in a state no single `git checkout` undoes.
+- **`replace` substitutes per line and rejoins with the captured terminators.** Rules
+  therefore cannot span a line, exactly like `sed`, and a CRLF file does not come back
+  as an every-line-changed diff. This is the same CRLF hazard `splitLines` exists for,
+  one layer down: `splitLines` discards the terminator, which is right for reading and
+  wrong for rewriting.
+- **Rules are `<from> <to>` positional pairs, never a `from=>to` string.** `=>` is
+  ordinary TypeScript. Any separator character is some language's syntax, and the
+  failure is silent — the rule splits in the wrong place and the rewrite still runs.
 - **Every write goes through `writeRepoFile`.** A blanket `Bash(tl:*)` allow rule
   bypasses Claude Code's own protected-path layer, so `writeGuard.ts` re-implements
   that list. A verb writing with bare `writeFileSync` silently defeats the guard.

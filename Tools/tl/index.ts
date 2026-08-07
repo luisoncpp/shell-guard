@@ -16,6 +16,7 @@ import { fallow } from './verbs/fallow';
 import { grep } from './verbs/grep';
 import { history, show } from './verbs/history';
 import { read, section } from './verbs/read';
+import { replace } from './verbs/replace';
 import { status } from './verbs/status';
 
 function where(): VerbResult {
@@ -37,6 +38,7 @@ const Verbs: Readonly<Record<string, VerbHandler>> = Object.freeze({
   grep,
   history,
   read,
+  replace,
   section,
   show,
   status,

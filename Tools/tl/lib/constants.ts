@@ -10,6 +10,9 @@ export const Limits = Object.freeze({
   MaxReportedLines: 400,
   EachMaxFiles: 200,
   CommitSubjectChars: 72,
+  ReplaceMaxRules: 8,
+  ReplaceMaxFiles: 200,
+  ReplacePreviewLines: 40,
 });
 
 export const ExpectedFallowSchemaVersion = 7;
@@ -32,8 +35,8 @@ export const SourceExtensions = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.
  */
 export const KnownFlags: ReadonlySet<string> = new Set([
   'audit', 'cached', 'cat', 'commits', 'count', 'count-lines', 'files-only', 'first-line',
-  'help', 'name-status', 'no-write', 'numstat', 'patch', 'quick', 'redact', 'show',
-  'stat', 'stop-on-fail', 'take', 'untracked',
+  'help', 'name-status', 'no-write', 'numstat', 'patch', 'quick', 'redact', 'regex',
+  'show', 'stat', 'stop-on-fail', 'take', 'untracked', 'word',
 ]);
 
 export const KnownOptions: ReadonlySet<string> = new Set([

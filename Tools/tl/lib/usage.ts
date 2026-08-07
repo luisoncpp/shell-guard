@@ -21,6 +21,14 @@ Inspection
   tl history --find=<glob>           every commit touching a path, all refs
   tl show <ref>:<path>               file contents at a revision
 
+Editing
+  tl replace <from> <to> [<from> <to> ...] -- <pathspec...>
+                                     replaces sed -i across files; rules apply in
+                                     order, within a line, literally by default
+                                     --word  match whole words only (identifiers)
+                                     --regex treat <from> as a regex, $1 in <to>
+                                     --take  write; without it this is a preview
+
 Gates and quality
   tl check [--quick]                 tsc --noEmit, npm run lint, npm run test:jest
                                      --project=<dir> gates one workspace directory
@@ -46,7 +54,7 @@ Output shaping (any verb, replaces a shell pipe)
 Options take values only as --key=value. A bare -- separates pathspecs. There are
 no short options: a single-dash token such as -n is an error, not a positional.
 
-Writes: enabled by default, and only --take writes. Set TL_WRITE=0 (or pass
---no-write) to disable. Every write drops a pre-image copy in TL_TMP/backups first,
+Writes: enabled by default, and only --take writes — on conflicts and on replace, so
+a verb without it is inspection. Set TL_WRITE=0 (or pass --no-write) to disable. Every write drops a pre-image copy in TL_TMP/backups first,
 refuses paths outside the repo, and refuses .git/.claude/.vscode/.idea/node_modules
 and friends. Nothing is ever staged, committed, pushed, or deleted.`;

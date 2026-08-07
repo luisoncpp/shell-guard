@@ -2,9 +2,9 @@
 
 name: tl
 
-description: Use when you need to search, inspect git state or files, run the project's quality gates, get a fallow quality report, branch churn numbers, resolve merge conflicts, or run several repo commands in one round-trip. Read this BEFORE composing any shell line containing a for-loop, command substitution, `awk`, `sed -i`, or inline `node -e`/`python -c` against this repo — no allow rule can name those shapes, so they prompt every time, and `tl` has a verb that replaces the job.
+description: Use when you need to search, inspect git state or files, rename an identifier or substitute text across many files, run the project's quality gates, get a fallow quality report, branch churn numbers, resolve merge conflicts, or run several repo commands in one round-trip. Read this BEFORE composing any shell line containing a for-loop, command substitution, `awk`, `sed -i`, or inline `node -e`/`python -c` against this repo — no allow rule can name those shapes, so they prompt every time, and `tl` has a verb that replaces the job.
 
-argument-hint: "verb (batch | grep | each | read | section | status | diff | history | show | check | fallow | diffstat | conflicts)"
+argument-hint: "verb (batch | grep | each | read | section | replace | status | diff | history | show | check | fallow | diffstat | conflicts)"
 
 \---
 
@@ -36,9 +36,9 @@ A `;` on its own is therefore \*\*not\*\* a reason to reach for `tl batch`. Thes
 
 &#x20; `node -e`/`python -c`\*\*. No allow rule can name those shapes, so they prompt every
 
-&#x20; time. Use the verb that replaces the job — `each`, `section`, `grep`, `fallow`,
+&#x20; time. Use the verb that replaces the job — `each`, `section`, `grep`, `replace`,
 
-&#x20; `diffstat`, `conflicts`.
+&#x20; `fallow`, `diffstat`, `conflicts`.
 
 \- You would \*\*pipe into a program that is not itself allowed\*\*. Use the shaping options
 
@@ -238,6 +238,44 @@ rather than silently running something else.
 
 
 
+\### Editing
+
+\- `tl replace <from> <to> \[<from> <to> ...] -- <pathspec...>` — this is `sed -i`, and
+
+&#x20; it is the reason you should not reach for `sed -i`. Rules are \*\*positional pairs\*\*,
+
+&#x20; applied in order, \*\*within a line\*\*, and \*\*literally\*\* unless you say otherwise —
+
+&#x20; so `a.b(c)` matches that text, not a regex. Pathspecs come after the `--`, and a
+
+&#x20; call without one is a usage error rather than a guess.
+
+&#x20; `--word` matches whole words only: this is the identifier-rename mode, and it is
+
+&#x20; what keeps `activeItems` → `liveItems` from mangling `activeItemsCount`.
+
+&#x20; `--regex` treats `<from>` as a regex with `$1` available in `<to>`.
+
+&#x20; \*\*Preview is the default.\*\* You get per-file before/after lines and a per-rule match
+
+&#x20; count; nothing is written until you re-run the same command with `--take`. Read the
+
+&#x20; preview — a rename that hits a file you did not expect is the signal to narrow the
+
+&#x20; pathspec, not to add a rule.
+
+
+
+One `tl replace` covers a whole `sed` script's worth of substitutions, so do not chain
+
+them. The five-expression `sed` line that motivated this verb — backtick-wrapped forms
+
+first, then bare, then `\b`-anchored — was three redundant rules: `--word` already
+
+covers every wrapping, because a backtick is not a word character.
+
+
+
 \### Conflicts
 
 \- `tl conflicts` — list conflicted files with hunk counts
@@ -268,7 +306,13 @@ those `awk` scripts corrupted files. `--take` never stages.
 
 
 
-Only `--take` writes. Writes are \*\*enabled by default\*\*; the rationale is the same as
+Only `--take` writes — on `conflicts` and on `replace`, the same flag both times, so a
+
+verb without it is inspection. A step carrying `--take` is refused inside `batch`,
+
+which is exactly why `tl replace` previews by default: the preview composes, the
+
+rewrite stands alone. Writes are \*\*enabled by default\*\*; the rationale is the same as
 
 `acceptEdits` mode — git holds the pre-change content, so a bad rewrite is recoverable
 
