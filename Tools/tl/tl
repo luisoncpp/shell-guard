@@ -1,0 +1,10 @@
+#!/bin/sh
+# PATH shim. Resolves tsx from Tools/tl/node_modules first so the folder can be
+# dropped into any repo without touching the host package.json; `--import tsx`
+# resolves from the *cwd*, which is exactly what breaks in a host that has no
+# tsx of its own. Falls back to the bare specifier when a host does provide one.
+dir=$(dirname "$0")
+if [ -f "$dir/node_modules/tsx/dist/cli.mjs" ]; then
+  exec node "$dir/node_modules/tsx/dist/cli.mjs" "$dir/index.ts" "$@"
+fi
+exec node --import tsx "$dir/index.ts" "$@"
