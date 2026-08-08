@@ -1,4 +1,4 @@
-import { assertWorkspaceName, workspaceGates } from "../lib/gatePlan";
+import { assertTestPath, assertWorkspaceName, workspaceGates } from "../lib/gatePlan";
 
 describe("assertWorkspaceName", () => {
   it("accepts plain and nested directory names", () => {
@@ -20,6 +20,19 @@ describe("assertWorkspaceName", () => {
   it("rejects anything a shell would expand", () => {
     for (const name of ["a b", "a;rm -rf /", "a&&b", "a|b", "$(id)", "a`id`", "a>b", "a*"]) {
       expect(() => assertWorkspaceName(name)).toThrow(/unsafe --project/);
+    }
+  });
+});
+
+describe("assertTestPath", () => {
+  it("accepts a repo-relative test file", () => {
+    expect(assertTestPath("Tools/tl/__tests__/argv.test.ts")).toBe("Tools/tl/__tests__/argv.test.ts");
+  });
+
+  it("refuses a value that would inject a second command into the jest gate", () => {
+    // --test is appended to an npm argument list, and runTool uses a shell on Windows.
+    for (const value of ["x & echo pwned & rem", "x && whoami", "$(id)", "../../etc/passwd", "--runInBand"]) {
+      expect(() => assertTestPath(value)).toThrow(/unsafe --test/);
     }
   });
 });

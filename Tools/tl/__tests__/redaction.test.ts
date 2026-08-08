@@ -40,4 +40,39 @@ describe("redactLine", () => {
   it("masks every line of a file", () => {
     expect(redactLines(["PORT=1", "JWT_SECRET=x"])).toEqual(["PORT=1", "JWT_SECRET=***"]);
   });
+
+  it.each([
+    "DB_PASS=hunter2",
+    "MYSQL_PWD=hunter2",
+    "AWS_ACCESS_KEY_ID=hunter2",
+    "signingSalt: hunter2",
+  ])("masks the shapes the first key list missed, in %s", (line) => {
+    expect(redactLine(line)).toContain("***");
+    expect(redactLine(line)).not.toContain("hunter2");
+  });
+
+  it("masks a bearer token wherever it appears in the line", () => {
+    expect(redactLine("curl -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.abc'"))
+      .toBe("curl -H 'Authorization: Bearer ***'");
+  });
+
+  it("keeps a masked JSON value valid JSON", () => {
+    expect(redactLine('  "private_key": "-----BEGIN KEY-----",')).toBe('  "private_key": "***",');
+  });
+
+  it("masks the anonymous body of a PEM block, which no per-line rule can spot", () => {
+    expect(redactLines([
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "MIIEowIBAAKCAQEAx7Gk8Q==",
+      "bGlrZSB0aGlzIG9uZQ==",
+      "-----END RSA PRIVATE KEY-----",
+      "PORT=3000",
+    ])).toEqual([
+      "-----BEGIN RSA PRIVATE KEY-----",
+      "***",
+      "***",
+      "-----END RSA PRIVATE KEY-----",
+      "PORT=3000",
+    ]);
+  });
 });

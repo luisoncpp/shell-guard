@@ -1,4 +1,5 @@
-// @Architecture(type=Module, descriptionShort="Gate table construction for check", descriptionLong="Pure rules behind `tl check --project`: the Gate shape, the strict workspace-name grammar, and the fixed gate template a workspace directory expands into. Kept dependency-free so the admission rules are unit-testable; verbs/check.ts supplies the filesystem answers this module takes as booleans.")
+// @Architecture(type=Module, descriptionShort="Gate table construction for check", descriptionLong="Pure rules behind `tl check --project`: the Gate shape, the strict workspace-name and test-path grammars, and the fixed gate template a workspace directory expands into. Kept dependency-free so the admission rules are unit-testable; verbs/check.ts supplies the filesystem answers this module takes as booleans.")
+import { isRepoRelativePath } from './shellSafety';
 
 export interface Gate {
   name: string;
@@ -8,18 +9,23 @@ export interface Gate {
 }
 
 /**
- * A workspace name reaches runTool, which uses a shell on Windows. The grammar is
- * therefore an allowlist, not a denylist: path segments of word characters, dots,
- * dashes and underscores, joined by forward slashes. No leading dash (an npm/npx
- * option), no `..` segment (an escape from the repo), nothing a shell would expand.
+ * Both of these reach runTool, which uses a shell on Windows, so both are allowlists
+ * rather than denylists — `isRepoRelativePath` in lib/shellSafety.ts holds the shared
+ * grammar. `--test` was the miss: it was appended to the jest gate's argument list
+ * raw, which made one pre-approved `tl check` an arbitrary command.
  */
-const WorkspaceName = /^[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_.][A-Za-z0-9_.-]*)*$/;
-
 export function assertWorkspaceName(name: string): string {
-  if (!WorkspaceName.test(name) || name.split('/').includes('..')) {
+  if (!isRepoRelativePath(name)) {
     throw new Error(`unsafe --project "${name}" (expected a repo-relative directory)`);
   }
   return name;
+}
+
+export function assertTestPath(value: string): string {
+  if (!isRepoRelativePath(value)) {
+    throw new Error(`unsafe --test "${value}" (expected a repo-relative test file path)`);
+  }
+  return value;
 }
 
 export const RootGates: readonly Gate[] = Object.freeze([

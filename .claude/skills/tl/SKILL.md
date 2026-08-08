@@ -166,13 +166,15 @@ rather than silently running something else.
 
 &#x20; `@Architecture`-header sweep. Note `--first=N`, not `--head=N`: `--head` shapes output.
 
-\- `tl read <file> \[--redact]` — `--redact` masks connection-string passwords and
+\- `tl read <file> \[--redact]` — `--redact` masks connection-string passwords, bearer
 
-&#x20; secret-looking assignment values. Use it for anything `.env`-shaped.
+&#x20; tokens, PEM key bodies and secret-looking assignment values (bare or JSON-quoted).
 
-\- `tl section <file> <startRegex> <endRegex>` — replaces `sed -n '/a/,/b/p'`,
+&#x20; Use it for anything `.env`-shaped.
 
-&#x20; inclusive of both boundary lines.
+\- `tl section <file> <startRegex> <endRegex> \[--redact]` — replaces
+
+&#x20; `sed -n '/a/,/b/p'`, inclusive of both boundary lines.
 
 
 
@@ -204,7 +206,11 @@ rather than silently running something else.
 
 &#x20; per-gate PASS/FAIL and the failing tail. `--quick` skips jest.
 
-&#x20; `--only=tsc|lint|jest` and `--test=<path>` give a focused run.
+&#x20; `--only=tsc|lint|jest` and `--test=<path>` give a focused run. `--test` takes a
+
+&#x20; \*\*repo-relative path\*\*, not a jest pattern: it ends up in an argument list bound
+
+&#x20; for a shell, so anything else is refused.
 
 &#x20; `--project=<dir>` gates one workspace directory instead of the repo root: its gates
 
@@ -224,7 +230,11 @@ rather than silently running something else.
 
 &#x20; in `node -e`. The verb pins `schema\_version` (currently \*\*7\*\*) and warns loudly if
 
-&#x20; fallow's shape changes, which a hand-written parser cannot do.
+&#x20; fallow's shape changes, which a hand-written parser cannot do. `fallow` must already
+
+&#x20; be a dependency of the repo — the verb refuses rather than let `npx` download and
+
+&#x20; run it — and `<base>` must be a plain ref name, since it reaches a shell.
 
 &#x20; Caveat: the finding \*\*count\*\* is not a quality signal. A CRAP-style score punishes
 
@@ -324,17 +334,29 @@ Because that rationale does \*not\* cover untracked files or uncommitted modific
 
 every write first copies the current file to
 
-`TL\_TMP/backups/<timestamp>\_\_<flattened-path>` and prints that path.
+`TL\_TMP/backups/<timestamp>/<repo-relative-path>` and prints that path.
 
 
 
 Disable with `--no-write` or `TL\_WRITE=0`. Writes are refused outside the repo and
 
-under `.git`, `.claude`, `.vscode`, `.idea`, `.husky`, `.cargo`, `.devcontainer`,
+under `.git`, `.github`, `.claude`, `.vscode`, `.idea`, `.husky`, `.cargo`,
 
-`.yarn`, `.mvn`, `node\_modules`, and for files like `.gitconfig` / `.npmrc` /
+`.devcontainer`, `.yarn`, `.mvn`, `node\_modules`, and for files like `.gitconfig` /
 
-`.mcp.json`. `tl` never stages, commits, pushes, or deletes.
+`.npmrc` / `.mcp.json` / `package.json` and the lockfiles — the manifests are
+
+protected because `tl check` runs whatever they declare, so rewriting one would make
+
+the next `tl check` arbitrary execution. `tl` never stages, commits, pushes, or deletes.
+
+
+
+"Outside the repo" is decided on the \*\*resolved\*\* path, so a symlink or a Windows
+
+junction pointing out of the tree is refused for reads as well as writes — including
+
+one a pathspec sweep found, since `git ls-files` walks into it.
 
 
 
@@ -356,7 +378,13 @@ argument\*\*; that converts one allow rule into an unrestricted shell.
 
 
 
-\- Route any file write through `writeRepoFile` in `Tools/tl/lib/writeGuard.ts`.
+\- Route any file write through `writeRepoFile` in `Tools/tl/lib/writeGuard.ts`, and
+
+&#x20; any read of a caller-named path through `readRepoText` in `lib/repoFile.ts`. A bare
+
+&#x20; `readFileSync` re-opens the read-outside-the-repo hole; a bare `writeFileSync`
+
+&#x20; silently defeats the write guard.
 
 \- Validate any caller-supplied git ref or pathspec with `assertSafeGitArgument` in
 
@@ -364,9 +392,15 @@ argument\*\*; that converts one allow rule into an unrestricted shell.
 
 \- Anything caller-supplied that reaches `runTool` needs an allowlist grammar first —
 
-&#x20; `runTool` uses a shell on Windows. See `assertWorkspaceName` in `lib/gatePlan.ts`,
+&#x20; `runTool` uses a shell on Windows and Node quotes nothing there. See
 
-&#x20; which is why `--project` can accept a directory name at all.
+&#x20; `assertWorkspaceName`/`assertTestPath` in `lib/gatePlan.ts` and `assertShellSafeRef`
+
+&#x20; in `lib/gitArgs.ts`. `runTool` re-checks every argument against
+
+&#x20; `assertShellSafeArguments`, so a forgotten grammar is a refusal rather than a shell
+
+&#x20; — do not weaken that backstop to make an argument fit.
 
 \- Return a `VerbResult` (`{lines, code}`); never `console.log`. Printing belongs to
 

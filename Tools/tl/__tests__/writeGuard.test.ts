@@ -16,7 +16,26 @@ describe("findProtectedSegment", () => {
   it("allows ordinary repository paths", () => {
     expect(findProtectedSegment("src/logic/CombatActor.ts")).toBeNull();
     expect(findProtectedSegment("docs/live/file-map.md")).toBeNull();
-    expect(findProtectedSegment("package.json")).toBeNull();
+    expect(findProtectedSegment("src/package.json.md")).toBeNull();
+  });
+
+  it("blocks the manifests and lockfiles that feed tl check", () => {
+    // The write→execute chain: `replace --take` rewrites a script, `tl check` runs it,
+    // and both calls are pre-approved by the same blanket rule.
+    expect(findProtectedSegment("package.json")).toBe("package.json");
+    expect(findProtectedSegment("server/package-lock.json")).toBe("package-lock.json");
+    expect(findProtectedSegment("pnpm-lock.yaml")).toBe("pnpm-lock.yaml");
+    expect(findProtectedSegment(".github/workflows/ci.yml")).toBe(".github");
+  });
+
+  it("blocks a protected segment however the filesystem would spell it", () => {
+    // NTFS and APFS are case-insensitive and Win32 strips trailing dots, so these
+    // three all open .git — a case-sensitive Set lookup walked past the whole list.
+    expect(findProtectedSegment(".GIT/config")).toBe(".git");
+    expect(findProtectedSegment(".Git/hooks/pre-commit")).toBe(".git");
+    expect(findProtectedSegment(".git./config")).toBe(".git");
+    expect(findProtectedSegment("NODE_MODULES/pkg/index.js")).toBe("node_modules");
+    expect(findProtectedSegment("server/.NPMRC")).toBe(".npmrc");
   });
 
   it("does not block on a substring of a protected name", () => {

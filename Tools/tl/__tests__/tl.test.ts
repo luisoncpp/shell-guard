@@ -1,5 +1,5 @@
 import { execFileSync } from "child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync } from "fs";
 import os from "os";
 import path from "path";
 
@@ -129,6 +129,86 @@ describe("tl write gate", () => {
     expect(result.status).toBe(1);
     expect(result.output).toContain("outside the repository");
     expect(readFileSync(outside, "utf8")).toBe(OneHunk);
+  });
+});
+
+describe("tl shell-argument guard", () => {
+  // Both of these reach runTool, which uses a shell on Windows where Node quotes
+  // nothing. Each was a working arbitrary-command execution under one Bash(tl:*) rule.
+  it("refuses a --test= value that would inject a command into the jest gate", () => {
+    const result = runCli(["check", "--only=jest", "--test=x & echo pwned > pwned.txt & rem"]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("unsafe --test");
+    expect(existsSync(path.join(RepoRoot, "pwned.txt"))).toBe(false);
+  });
+
+  it("refuses a fallow base that would inject a command", () => {
+    const result = runCli(["fallow", "audit", "x & echo pwned > pwned.txt & rem"]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("refusing base");
+    expect(existsSync(path.join(RepoRoot, "pwned.txt"))).toBe(false);
+  });
+});
+
+describe("tl link containment", () => {
+  function linkOutside(name: string): string | null {
+    const outsideDir = path.join(tmpRoot, name);
+    mkdirSync(outsideDir, { recursive: true });
+    writeFileSync(path.join(outsideDir, "secret.md"), OneHunk, "utf8");
+    const link = path.join(FixtureDir, name);
+    try {
+      // A junction needs no administrator rights on Windows; elsewhere this is a
+      // directory symlink, which git itself will happily carry in a hostile repo.
+      symlinkSync(outsideDir, link, "junction");
+    } catch {
+      return null;
+    }
+    return link;
+  }
+
+  function removeLink(link: string): void {
+    try {
+      unlinkSync(link);
+    } catch {
+      rmdirSync(link);
+    }
+  }
+
+  it("refuses to read or write through a link that leaves the repository", () => {
+    const link = linkOutside("escape-tree");
+    if (!link) return; // no permission to create links here; the unit guards still hold
+    const target = path.join(tmpRoot, "escape-tree", "secret.md");
+    const through = "Tools/tl/__fixtures__/escape-tree/secret.md";
+    try {
+      const shown = runCli(["read", through]);
+      expect(shown.status).toBe(1);
+      expect(shown.output).toContain("outside the repository");
+      expect(shown.output).not.toContain("<<<<<<<");
+
+      const taken = runCli(["conflicts", "--take", through, "theirs"]);
+      expect(taken.status).toBe(1);
+      expect(taken.output).toContain("outside the repository");
+      expect(readFileSync(target, "utf8")).toBe(OneHunk);
+
+      // Whether `git ls-files --others` walks into the link is git's business; either
+      // the sweep never names the file or the reader refuses it. It is never rewritten.
+      const rewritten = runCli(["replace", "ours", "pwned", "--take", "--", through]);
+      expect(rewritten.output).not.toContain("file(s) written");
+      expect(readFileSync(target, "utf8")).toBe(OneHunk);
+    } finally {
+      removeLink(link);
+    }
+  });
+});
+
+describe("tl conflicts --show", () => {
+  it("confines the reader to the repository", () => {
+    const outside = path.join(tmpRoot, "outside-show.md");
+    writeFileSync(outside, OneHunk, "utf8");
+    const result = runCli(["conflicts", "--show", outside]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("outside the repository");
+    expect(result.output).not.toContain("<<<<<<<");
   });
 });
 

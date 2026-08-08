@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { ParsedArgs } from '../lib/argv';
 import { Limits } from '../lib/constants';
 import type { Gate } from '../lib/gatePlan';
-import { RootGates, assertWorkspaceName, workspaceGates } from '../lib/gatePlan';
+import { RootGates, assertTestPath, assertWorkspaceName, workspaceGates } from '../lib/gatePlan';
 import { isInsideRepo, repoRoot } from '../lib/paths';
 import { runTool } from '../lib/run';
 import type { VerbResult } from '../lib/verb';
@@ -48,7 +48,10 @@ function selectGates(args: ParsedArgs): readonly Gate[] {
   if (only && !project.some((gate) => gate.name === only)) {
     throw new Error(`--only=${only} is not a gate of --project=${projectName}`);
   }
-  const testPath = args.options.get('test');
+  // --test lands in an argument list bound for runTool, which uses a shell on Windows:
+  // it needs the same allowlist grammar --project has, and for the same reason.
+  const requested = args.options.get('test');
+  const testPath = requested === undefined ? undefined : assertTestPath(requested);
   const named = only ? project.filter((gate) => gate.name === only) : project;
   const focused = testPath ? named.map((gate) => focusedJest(gate, testPath)) : named;
   return focused.filter((gate) => !args.flags.has('quick') || gate.inQuickRun);

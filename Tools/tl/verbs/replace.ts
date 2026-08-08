@@ -1,11 +1,9 @@
 // @Architecture(type=Module, descriptionShort="Applies from/to substitution rules across a pathspec, previewing by default", descriptionLong="The verb that replaces `sed -i 's/a/b/g' file file file` — a shape no allow rule can name, so it prompted every time. IO half only: expands the pathspec, reads each file, hands the contents to replacePlan, and writes through writeGuard. Previewing is the default and `--take` is the write, which keeps tl's one-write-flag rule intact and means batch's existing --take denial already covers this verb. Writability for every target is asserted before any file is read, so a refusal never leaks a protected file's contents into the transcript.")
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import type { ParsedArgs } from '../lib/argv';
 import { Limits } from '../lib/constants';
 import { listRepoFiles } from '../lib/fileList';
 import { capLines } from '../lib/outputShaping';
-import { repoRoot } from '../lib/paths';
+import { readRepoBuffer, resolveInsideRepo } from '../lib/repoFile';
 import { applyRules, describeRule, parseRules, resolveReplaceMode, type FileChange, type ReplacePlan } from '../lib/replacePlan';
 import { ok, type VerbResult } from '../lib/verb';
 import { assertWritable, writeRepoFile } from '../lib/writeGuard';
@@ -20,8 +18,8 @@ interface FileOutcome {
 }
 
 /** A rewrite decoded as UTF-8 and written back would corrupt an image or a binary fixture. */
-function readTextOrNull(absolutePath: string): string | null {
-  const buffer = readFileSync(absolutePath);
+function readTextOrNull(relativePath: string): string | null {
+  const buffer = readRepoBuffer(relativePath);
   return buffer.includes(NulByte) ? null : buffer.toString('utf8');
 }
 
@@ -66,7 +64,9 @@ export function replace(args: ParsedArgs): VerbResult {
   const taking = args.flags.has('take');
   const files = listRepoFiles(args.paths, { usage: Usage, cap: Limits.ReplaceMaxFiles });
   if (files.length === 0) return ok(['no files match that pathspec']);
-  const absolutePaths = files.map((relativePath) => path.resolve(repoRoot(), relativePath));
+  // Resolved through any link first: `git ls-files` walks into a junction, so the
+  // match set can name a file that lives outside the repository.
+  const absolutePaths = files.map((relativePath) => resolveInsideRepo(relativePath, taking ? 'write' : 'read'));
   // Permission before disclosure, and before the first write: a pathspec that sweeps in
   // one protected file must fail the whole call rather than half-rewrite the rest.
   if (taking) for (const absolutePath of absolutePaths) assertWritable(absolutePath);
@@ -74,7 +74,7 @@ export function replace(args: ParsedArgs): VerbResult {
   const outcomes: FileOutcome[] = [];
   let skipped = 0;
   for (const [index, relativePath] of files.entries()) {
-    const contents = readTextOrNull(absolutePaths[index]);
+    const contents = readTextOrNull(relativePath);
     if (contents === null) {
       skipped += 1;
       continue;

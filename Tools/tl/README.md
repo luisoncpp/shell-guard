@@ -55,8 +55,8 @@ the quality of the code; do not chase it to zero.
 
 | Layer | Files | Coverage |
 |-------|-------|----------|
-| Pure rules | `lib/argv.ts`, `lib/batchPlan.ts`, `lib/conflictResolver.ts`, `lib/constants.ts`, `lib/diffCounting.ts`, `lib/eachPlan.ts`, `lib/fallowReport.ts`, `lib/gatePlan.ts`, `lib/gitArgs.ts`, `lib/grepQuery.ts`, `lib/lines.ts`, `lib/outputShaping.ts`, `lib/redaction.ts`, `lib/replacePlan.ts`, `lib/sectionSlice.ts`, `lib/usage.ts`, `lib/verb.ts` | ~100% in-process |
-| IO | `lib/run.ts`, `lib/paths.ts`, `lib/fileList.ts`, `lib/writeGuard.ts`, `verbs/*.ts`, `index.ts` | subprocess only (uncredited) |
+| Pure rules | `lib/argv.ts`, `lib/batchPlan.ts`, `lib/conflictResolver.ts`, `lib/constants.ts`, `lib/diffCounting.ts`, `lib/eachPlan.ts`, `lib/fallowReport.ts`, `lib/gatePlan.ts`, `lib/gitArgs.ts`, `lib/grepQuery.ts`, `lib/lines.ts`, `lib/outputShaping.ts`, `lib/redaction.ts`, `lib/replacePlan.ts`, `lib/sectionSlice.ts`, `lib/shellSafety.ts`, `lib/usage.ts`, `lib/verb.ts` | ~100% in-process |
+| IO | `lib/run.ts`, `lib/paths.ts`, `lib/fileList.ts`, `lib/repoFile.ts`, `lib/writeGuard.ts`, `verbs/*.ts`, `index.ts` | subprocess only (uncredited) |
 
 **A new rule belongs in a pure module.** Putting it in a verb costs coverage,
 testability, and a complexity finding.
@@ -72,25 +72,27 @@ Paths are relative to this directory.
 | `lib/verb.ts` | The `VerbResult`/`VerbHandler`/`StepDispatch` contract. Its own module so verbs never import `index.ts` |
 | `lib/outputShaping.ts` | **Pure.** `shapeLines` (grep → maxCols → head → tail), `capLines` |
 | `lib/batchPlan.ts` | **Pure.** `tokenizeStep` (quote-aware), `planSteps` admission: verb known, not `batch`, no `--take`, step cap |
-| `lib/gitArgs.ts` | **Pure.** `assertSafeGitArgument` (no leading dash), `buildDiffArgs`, `buildLogArgs`, `resolveDiffMode` |
-| `lib/grepQuery.ts` | **Pure.** `git grep` argument construction (pattern behind `-e`), output reduction |
+| `lib/gitArgs.ts` | **Pure.** `assertSafeGitArgument` (no leading dash), `assertShellSafeRef` (allowlist grammar for a ref bound for `runTool`), `buildDiffArgs`, `buildLogArgs`, `resolveDiffMode` |
+| `lib/shellSafety.ts` | **Pure.** `assertShellSafeArgument`/`assertShellSafeArguments` (the allowlist every `runTool` argument passes), `isRepoRelativePath` (the shared `--project`/`--test` grammar) |
+| `lib/grepQuery.ts` | **Pure.** `git grep` argument construction (pattern behind `-e`), output reduction, `keepContainedLines` (drops hits git found through a link out of the repo) |
 | `lib/eachPlan.ts` | **Pure.** `resolveEachRequest` (one mode only), `summariseFile` |
-| `lib/gatePlan.ts` | **Pure.** The `Gate` shape, `RootGates`, `assertWorkspaceName` (shell-safe directory grammar), `workspaceGates` (the fixed per-workspace gate template) |
+| `lib/gatePlan.ts` | **Pure.** The `Gate` shape, `RootGates`, `assertWorkspaceName` / `assertTestPath` (shell-safe path grammars), `workspaceGates` (the fixed per-workspace gate template) |
 | `lib/replacePlan.ts` | **Pure.** `parseRules` (positional pairs), `buildMatcher` (literal escaping, word boundaries, regex), `applyRules` per line with terminators preserved |
 | `lib/lines.ts` | **Pure.** `splitLines` on `/\r?\n/` — see the CRLF invariant below |
-| `lib/redaction.ts` | **Pure.** `redactLine`: connection-string passwords + secret-looking assignment values |
+| `lib/redaction.ts` | **Pure.** `redactLine`: connection-string passwords, bearer tokens, secret-looking assignment values (bare or JSON-quoted); `redactLines` also masks PEM key bodies, which no per-line rule can spot |
 | `lib/sectionSlice.ts` | **Pure.** `sliceSection`, inclusive of both boundaries like `sed -n '/a/,/b/p'` |
 | `lib/usage.ts` | Usage text only, kept out of `index.ts` so the entry point stays scannable |
 | `lib/constants.ts` | Frozen tunables: `Limits`, `ExpectedFallowSchemaVersion`, `DefaultDiffBase`, `ConflictMarkers`, `SourceExtensions`, `KnownFlags`, `KnownOptions` |
 | `lib/conflictResolver.ts` | **Pure.** `classifyLine` marker state machine, `countHunks`, `resolveLines`, `parseSpec` |
 | `lib/diffCounting.ts` | **Pure.** `countSubstantiveLines(diffText)`, `parseNumstat`, `rankByChurn`, `totalChurn`, `isCountableSource` |
 | `lib/fallowReport.ts` | **Pure.** `reduceAudit`/`reduceDupes`/`deadCodeLines`/`newGroupLines` → printable lines + pass/fail, `schemaWarning`, `parseSection` |
-| `lib/run.ts` | `runGit` (shell:false), `runTool` (shell:true, npm/npx only), `gitLines` |
-| `lib/paths.ts` | Cached `repoRoot()` via `git rev-parse --show-toplevel`, `tmpDir()` (`TL_TMP` or os tmp), `backupDir()`, containment helpers |
+| `lib/run.ts` | `runGit` (shell:false), `runTool` (shell:true for `npm.cmd`/`npx.cmd`, arguments allowlisted first), `resolveExecutable` (absolute path from `PATH`, cwd never searched), `gitLines` |
+| `lib/paths.ts` | Cached `repoRoot()` via `git rev-parse --show-toplevel`, `tmpDir()` (`TL_TMP` or os tmp), `backupDir()`, `realPath()` and the containment helpers built on it |
+| `lib/repoFile.ts` | The single **read** choke point for a caller-named path: `resolveInsideRepo`, `readRepoText`/`readRepoBuffer`/`readRepoLines` |
 | `lib/writeGuard.ts` | The single write choke point: toggle, containment, `findProtectedSegment`, pre-image copy, then write |
 | `verbs/batch.ts` | Runs planned steps through the injected dispatcher, labels each, applies per-step shaping |
 | `verbs/check.ts` | Resolves `--project` to a directory, answers `gatePlan`'s filesystem questions (tsconfig present, package scripts), runs the gates, per-gate status + failing tail |
-| `verbs/fallow.ts` | Invokes `npx fallow --format json`, delegates all formatting to `fallowReport` |
+| `verbs/fallow.ts` | Invokes `npx fallow --format json` — only if `fallow` is already installed in the repo — and delegates all formatting to `fallowReport` |
 | `verbs/diffstat.ts` | Captures `git diff --numstat` / `-U0`, delegates counting to `diffCounting` |
 | `verbs/diff.ts` | `git diff` over caller-supplied refs in a chosen mode |
 | `verbs/history.ts` | `--file` provenance, `--commits` per-commit breakdown, `--find` across all refs; also `show` |
@@ -99,7 +101,7 @@ Paths are relative to this directory.
 | `verbs/each.ts` | Applies one `eachPlan` mode to every file `fileList` returns |
 | `verbs/replace.ts` | Preview-by-default substitution across a pathspec; `--take` writes through `writeGuard` |
 | `lib/fileList.ts` | `listRepoFiles`: pathspec → file list via `git ls-files`, with a caller-supplied cap. Shared by `each` and `replace` |
-| `verbs/read.ts` | `read` (optionally redacted) and `section`, both confined to the repo |
+| `verbs/read.ts` | `read` and `section`, both optionally `--redact`ed and both confined to the repo through `repoFile` |
 | `verbs/conflicts.ts` | Conflict listing, hunk display, `--audit`, `--take` orchestration |
 | `tl`, `tl.cmd` | PATH shims; run `index.ts` through the vendored `tsx`, resolved from the script's own directory rather than the cwd |
 | `package.json` | This directory's private manifest — the `tsx` dependency, kept out of the host's |
@@ -107,7 +109,7 @@ Paths are relative to this directory.
 Tests: one in-process suite per pure module
 (`argv`, `batchPlan`, `conflictResolver`, `diffCounting`, `eachPlan`, `fallowReport`,
 `gatePlan`, `gitArgs`, `grepQuery`, `outputShaping`, `redaction`, `replacePlan`, `sectionSlice`,
-`writeGuard`),
+`shellSafety`, `writeGuard`),
 plus `__tests__/tl.test.ts` — subprocess through the same vendored `tsx`, for end-to-end
 wiring and the guards only.
 
@@ -147,7 +149,9 @@ language rather than a fixed list of pre-approved verbs.
    markers, dropping `|||||||` base sections unconditionally, and dropping the
    non-chosen side.
 7. `writeRepoFile` re-asserts the guard, copies the current file to
-   `TL_TMP/backups/<iso-stamp>__<flattened-path>`, then writes.
+   `TL_TMP/backups/<iso-stamp>/<repo-relative-path>`, then writes. Nested rather than
+   flattened: `a/b` and a real `a__b` flattened to the same name, and one pre-image
+   overwrote the other.
 8. Surviving marker count becomes the exit code (non-zero if any remain).
 
 ## Data flow — `replace <from> <to> ... -- <pathspec...>`
@@ -181,10 +185,10 @@ entry can name, so it prompted on every rename.
   output escapes `batch`'s step labelling.
 - **The set of executable programs is a compile-time constant.** `lib/gatePlan.ts` is
   the only place a program name appears (`npx tsc`, `npm run`); `--project` supplies a
-  *directory*, never a command. The npm script it runs must already exist in that
-  workspace's `package.json`, and the directory must pass `assertWorkspaceName` —
-  `runTool` uses a shell on Windows, so an unvalidated name there would make one allow
-  rule cover arbitrary execution.
+  *directory* and `--test` a *path*, never a command. The npm script it runs must
+  already exist in that workspace's `package.json`, and both values must pass their
+  grammar — `runTool` uses a shell on Windows, so an unvalidated one there makes one
+  allow rule cover arbitrary execution. It did, for `--test`.
 - **`batch` composes verbs, never programs.** No step may write, nest, or name anything
   outside the verb table. `tl exec "<pipeline>"` must never exist: under a blanket
   `Bash(tl:*)` rule it would be an unrestricted shell.
@@ -229,12 +233,52 @@ entry can name, so it prompted on every rename.
 - **Rules are `<from> <to>` positional pairs, never a `from=>to` string.** `=>` is
   ordinary TypeScript. Any separator character is some language's syntax, and the
   failure is silent — the rule splits in the wrong place and the rewrite still runs.
-- **Every write goes through `writeRepoFile`.** A blanket `Bash(tl:*)` allow rule
-  bypasses Claude Code's own protected-path layer, so `writeGuard.ts` re-implements
-  that list. A verb writing with bare `writeFileSync` silently defeats the guard.
+- **Every write goes through `writeRepoFile`, and every read of a caller-named path
+  through `repoFile`.** A blanket `Bash(tl:*)` allow rule bypasses Claude Code's own
+  protected-path layer, so `writeGuard.ts` re-implements that list. A verb writing with
+  bare `writeFileSync` silently defeats the guard, and one reading with bare
+  `readFileSync` re-opens the disclosure hole — which is exactly how
+  `conflicts --show ../../secret` and `fallow --baseline=<any json>` used to read
+  outside the repository.
+- **Containment is decided on the *resolved* path, never the typed one.**
+  `path.relative` on an unresolved path is not containment: a symlink — or a Windows
+  junction, which needs no administrator rights and which `git ls-files --others`
+  walks straight into — puts `repo/link/x` lexically inside the repository while the
+  filesystem opens something else, and both read and write follow the reparse point.
+  `realPath()` resolves first (as far as the nearest existing ancestor, for a file
+  about to be created) and the protected-path check runs on that same resolved path,
+  so a link named `docs/notes.md` pointing at `.claude/` is a write to `.claude/`.
+  `tl grep` is the one read that git performs rather than `repoFile`, so it filters
+  its own hits back to the repository and reports the count it hid.
+- **The protected-path list is matched case- and dot-folded.** NTFS and APFS are
+  case-insensitive and Win32 strips trailing dots from a path component, so `.GIT/`,
+  `.Git/` and `.git./` all open `.git/`. A case-sensitive `Set` lookup let any of
+  those spellings walk past the entire list.
+- **`package.json`, the lockfiles and `.github/` are protected too.** Not because
+  editing them is dangerous in itself, but because of the write→execute chain:
+  `tl check` runs whatever `package.json` declares, so one pre-approved
+  `replace --take` would make the next pre-approved `tl check` arbitrary execution.
 - **`runGit` must never use a shell.** It receives caller-supplied file paths.
   `runTool` may use one only because Node refuses to spawn `npm.cmd`/`npx.cmd`
-  directly on Windows, and its argument lists are hardcoded here. Do not merge them.
+  directly on Windows. Do not merge them.
+- **Every argument reaching `runTool` passes an allowlist, at the call site *and* in
+  `runTool` itself.** Node quotes nothing in shell mode, so one unvalidated value is
+  arbitrary command execution — which is what `check --test=` and `fallow audit <base>`
+  were: `--test` was appended raw, and the base was guarded by `assertSafeGitArgument`,
+  which only refuses a leading dash and says nothing about `&`. Each caller-supplied
+  value now has a grammar (`assertTestPath`, `assertWorkspaceName`,
+  `assertShellSafeRef`) and `assertShellSafeArguments` in `runTool` is the backstop
+  that makes forgetting one at a *new* call site a refusal rather than a shell.
+- **`git`, `npm` and `npx` are resolved to an absolute path from `PATH` before they
+  are spawned.** Windows `CreateProcess` and `cmd.exe` search the **current directory
+  before `PATH`**, so a `git.exe` — or an `npm.cmd`, which is plain text and survives
+  a clone — sitting in a hostile repository root would run instead of the real
+  program, on the first `tl` call. Relative `PATH` entries are skipped for the same
+  reason, and `tl.cmd` sets `NoDefaultCurrentDirectoryInExePath` before invoking
+  `node` for the one search that happens before any of this code runs.
+- **`fallow` must already be installed in the repository.** `npx <name>` downloads and
+  executes a package when it is absent, which under a blanket allow rule is a
+  pre-approved fetch-and-execute of whatever the registry serves today.
 - **`tl` never stages, commits, pushes, or deletes.** Those are the mutations that
   should keep prompting; the small verb surface is what makes one broad allow rule
   defensible.
@@ -357,11 +401,28 @@ The `:*` suffix is the argument wildcard: `Bash(tl:*)` allows `tl` plus any argu
 
 A blanket `tl:*` pre-approves every verb, so the safety argument has to live in the tool
 rather than in the prompt. It does: `tl` never stages, commits, pushes or deletes; the
-only write path is `conflicts --take`, which goes through `writeRepoFile` and its own
-protected-path list (see [Invariants](#invariants)); and no verb accepts a program name,
-script path or shell string. Adding a verb that broke any of those would turn this one
-rule into an unrestricted shell — which is why "Adding a verb" in the skill file forbids
-it.
+write paths are `conflicts --take` and `replace --take`, both through `writeRepoFile`
+and its protected-path list; every read of a caller-named path goes through `repoFile`;
+containment is decided on the *resolved* path, so a symlink or a junction does not
+escape it; every value that reaches a shell passes an allowlist grammar; `git`, `npm`
+and `npx` are resolved absolutely so the current directory is never searched for them;
+and no verb accepts a program name, script path or shell string. See
+[Invariants](#invariants) for each. Adding a verb that broke any of those would turn
+this one rule into an unrestricted shell — which is why "Adding a verb" in the skill
+file forbids it, and the two rules that *were* broken (`check --test=` and
+`fallow audit <base>` reached `runTool` unvalidated) were arbitrary command execution
+under this allow rule until they were given grammars.
+
+**What the rule still covers, by design.** `tl` is a repo-editing tool, so a
+pre-approved `replace --take` can rewrite source that a pre-approved `tl check` then
+executes as a test. Protecting `package.json`, the lockfiles and `.github/` closes the
+shortest version of that chain; the general one is inherent to any tool that can both
+edit and run a repository, and it is why the write surface stays this small. Two more
+worth stating plainly: writes are enabled by default under the same rationale as
+`acceptEdits` mode (git holds the pre-change content, and a pre-image is copied to
+`TL_TMP/backups/` besides), and `tl check`/`tl fallow` run the repository's own npm
+scripts. A repo that wants less than that pre-approved should allow the read-only
+spellings and let `--take` prompt.
 
 ### Adding them without editing JSON
 

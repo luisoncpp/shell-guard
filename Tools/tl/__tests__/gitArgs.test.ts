@@ -1,4 +1,22 @@
-import { assertSafeGitArgument, assertSafePathspecs, buildDiffArgs, buildLogArgs, resolveDiffMode } from "../lib/gitArgs";
+import { assertSafeGitArgument, assertSafePathspecs, assertShellSafeRef, buildDiffArgs, buildLogArgs, resolveDiffMode } from "../lib/gitArgs";
+
+describe("assertShellSafeRef", () => {
+  it("accepts the ref shapes a base actually takes", () => {
+    expect(assertShellSafeRef("origin/develop", "base")).toBe("origin/develop");
+    expect(assertShellSafeRef("HEAD~3", "base")).toBe("HEAD~3");
+    expect(assertShellSafeRef("v1.2.3", "base")).toBe("v1.2.3");
+    expect(assertShellSafeRef("a1b2c3d", "base")).toBe("a1b2c3d");
+  });
+
+  it("refuses what assertSafeGitArgument would have let through to a shell", () => {
+    // `tl fallow audit <base>` reaches runTool. The dash check is the wrong guard for
+    // a shell sink: none of these starts with a dash.
+    for (const value of ["x & echo pwned & rem", "x | whoami", "$(id)", "a`id`", "HEAD^", "%PATH%", "a b"]) {
+      expect(() => assertShellSafeRef(value, "base")).toThrow(/refusing base/);
+      expect(() => assertSafeGitArgument(value, "base")).not.toThrow();
+    }
+  });
+});
 
 describe("assertSafeGitArgument", () => {
   it("returns a plain value unchanged", () => {

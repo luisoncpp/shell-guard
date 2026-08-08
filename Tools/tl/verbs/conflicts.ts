@@ -1,11 +1,11 @@
 // @Architecture(type=Module, descriptionShort="Lists, shows, audits and resolves merge conflicts", descriptionLong="IO half of conflict handling: enumerates conflicted files via git, renders hunks, audits which staged files differ from BOTH merge parents, and routes --take through the pure conflictResolver then writeGuard. Asserts writability BEFORE reading the file, so a refusal never leaks a protected file's contents into the transcript. Never stages.")
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { ParsedArgs } from '../lib/argv';
 import { ConflictMarkers, Limits } from '../lib/constants';
 import { classifyLine, countHunks, parseSpec, resolveLines } from '../lib/conflictResolver';
 import { gitLines, runGit } from '../lib/run';
 import { repoRoot } from '../lib/paths';
+import { readRepoText } from '../lib/repoFile';
 import { ok, type VerbResult } from '../lib/verb';
 import { assertWritable, writeRepoFile } from '../lib/writeGuard';
 
@@ -13,8 +13,13 @@ function conflictedFiles(): string[] {
   return gitLines(['diff', '--name-only', '--diff-filter=U']);
 }
 
+/**
+ * Through the confined reader, and split raw rather than with splitLines: the
+ * resolver rejoins with the terminators it was given. `--show` takes a caller-named
+ * path, so without the confinement `--show ../../secret` printed it.
+ */
 function readLines(relativePath: string): string[] {
-  return readFileSync(path.resolve(repoRoot(), relativePath), 'utf8').split('\n');
+  return readRepoText(relativePath).split('\n');
 }
 
 function listConflicts(): VerbResult {

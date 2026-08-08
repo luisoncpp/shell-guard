@@ -23,6 +23,22 @@ export function assertSafeGitArgument(value: string, label: string): string {
   return value;
 }
 
+/**
+ * A ref that reaches `runTool` is bound for a shell on Windows, where Node quotes
+ * nothing — so `assertSafeGitArgument` is the wrong guard there. Refusing a leading
+ * dash says nothing about `&`, and a denylist of shell metacharacters is a guess;
+ * this is the allowlist: what a ref name actually needs and nothing cmd.exe reads as
+ * syntax. `HEAD^` is refused rather than escaped — `^` is cmd's escape character.
+ */
+const ShellSafeRef = /^[A-Za-z0-9][A-Za-z0-9._/~-]*$/;
+
+export function assertShellSafeRef(value: string, label: string): string {
+  if (!ShellSafeRef.test(value)) {
+    throw new Error(`refusing ${label} "${value}": a ref reaching a shell must start with a letter or digit and use only letters, digits and . _ / ~ -`);
+  }
+  return value;
+}
+
 export function assertSafePathspecs(paths: readonly string[]): string[] {
   return paths.map((pathspec) => assertSafeGitArgument(pathspec, 'pathspec'));
 }

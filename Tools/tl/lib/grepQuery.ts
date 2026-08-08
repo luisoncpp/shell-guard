@@ -29,3 +29,33 @@ export function buildGrepArgs(spec: GrepSpec): string[] {
 export function reduceGrepOutput(stdout: string): string[] {
   return stdout.split('\n').map((line) => line.trimEnd()).filter((line) => line.length > 0);
 }
+
+const PathSeparatorIndex = 0;
+const NotFound = -1;
+
+/** `path:line:text`, `path:count` or a bare `path` — every mode leads with the file. */
+export function grepLinePath(line: string, filesOnly: boolean): string {
+  if (filesOnly) return line;
+  const colon = line.indexOf(':');
+  return colon === NotFound ? line : line.slice(PathSeparatorIndex, colon);
+}
+
+export interface ContainedGrepOutput {
+  lines: string[];
+  hidden: number;
+}
+
+/**
+ * `git grep --untracked` walks into a symlink or a Windows junction, so a hit can be a
+ * file that lives outside the repository — the one read path that does not go through
+ * repoFile, because git does the reading. The containment predicate is injected so the
+ * rule stays pure; the hidden count is reported rather than swallowed.
+ */
+export function keepContainedLines(
+  lines: readonly string[],
+  filesOnly: boolean,
+  isContained: (relativePath: string) => boolean,
+): ContainedGrepOutput {
+  const kept = lines.filter((line) => isContained(grepLinePath(line, filesOnly)));
+  return { lines: kept, hidden: lines.length - kept.length };
+}
