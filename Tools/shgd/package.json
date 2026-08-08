@@ -1,0 +1,10 @@
+{
+  "name": "shgd",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained shgd toolbelt. Drop this folder into a repo and run `npm install` inside it once; nothing outside Tools/shgd is touched.",
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}
