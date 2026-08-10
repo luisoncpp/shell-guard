@@ -20,6 +20,8 @@ Inspection
   shgd history --commits[=<base>]      per-commit changed files over base..HEAD
   shgd history --find=<glob>           every commit touching a path, all refs
   shgd show <ref>:<path>               file contents at a revision
+  shgd ignored <path> [path...]        is it gitignored, and by which rule and line
+                                     --no-index answers for a tracked path too
 
 Editing
   shgd replace <from> <to> [<from> <to> ...] -- <pathspec...>

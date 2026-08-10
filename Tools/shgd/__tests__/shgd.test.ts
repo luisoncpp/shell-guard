@@ -384,6 +384,36 @@ describe("shgd replace end to end", () => {
   });
 });
 
+describe("shgd ignored end to end", () => {
+  it("names the .gitignore rule that decided an ignored path", () => {
+    writeFixture(".gitignore", "*.log\n");
+    const result = runCli(["ignored", "Tools/shgd/__fixtures__/app.log"]);
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("Tools/shgd/__fixtures__/.gitignore:1");
+    expect(result.output).toContain("*.log");
+    expect(result.output).toContain("-- 1 of 1 path(s) ignored");
+  });
+
+  it("answers exit 0 with a verdict when nothing is ignored, so a batch does not halt", () => {
+    const result = runCli(["ignored", "Tools/shgd/index.ts"]);
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("not ignored: Tools/shgd/index.ts");
+    expect(result.output).toContain("-- 0 of 1 path(s) ignored");
+  });
+
+  it("refuses a path resolving outside the repository", () => {
+    const result = runCli(["ignored", "../outside.log"]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("outside the repository");
+  });
+
+  it("refuses a call with no path", () => {
+    const result = runCli(["ignored"]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("usage: shgd ignored");
+  });
+});
+
 describe("shgd dispatch", () => {
   it("reports usage and exit 2 for an unknown verb", () => {
     const result = runCli(["bogus"]);

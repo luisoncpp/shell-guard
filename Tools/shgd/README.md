@@ -75,6 +75,7 @@ Paths are relative to this directory.
 | `lib/gitArgs.ts` | **Pure.** `assertSafeGitArgument` (no leading dash), `assertShellSafeRef` (allowlist grammar for a ref bound for `runTool`), `buildDiffArgs`, `buildLogArgs`, `resolveDiffMode` |
 | `lib/shellSafety.ts` | **Pure.** `assertShellSafeArgument`/`assertShellSafeArguments` (the allowlist every `runTool` argument passes), `isRepoRelativePath` (the shared `--project`/`--test` grammar) |
 | `lib/grepQuery.ts` | **Pure.** `git grep` argument construction (pattern behind `-e`), output reduction, `keepContainedLines` (drops hits git found through a link out of the repo) |
+| `lib/ignoreQuery.ts` | **Pure.** `git check-ignore` argument construction (`--verbose` always paired with `--non-matching`), `parseCheckIgnore` → one verdict per path, `formatVerdicts` |
 | `lib/eachPlan.ts` | **Pure.** `resolveEachRequest` (one mode only), `summariseFile` |
 | `lib/gatePlan.ts` | **Pure.** The `Gate` shape, `RootGates`, `assertWorkspaceName` / `assertTestPath` (shell-safe path grammars), `workspaceGates` (the fixed per-workspace gate template) |
 | `lib/replacePlan.ts` | **Pure.** `parseRules` (positional pairs), `buildMatcher` (literal escaping, word boundaries, regex), `applyRules` per line with terminators preserved |
@@ -98,6 +99,7 @@ Paths are relative to this directory.
 | `verbs/history.ts` | `--file` provenance, `--commits` per-commit breakdown, `--find` across all refs; also `show` |
 | `verbs/status.ts` | Branch line + porcelain + conflicted count |
 | `verbs/grep.ts` | `git grep` wrapper; no matches is exit 0, not exit 1 |
+| `verbs/ignored.ts` | `git check-ignore` wrapper: which rule ignores a path, and from which file and line. Nothing ignored is exit 0, not exit 1 |
 | `verbs/each.ts` | Applies one `eachPlan` mode to every file `fileList` returns |
 | `verbs/replace.ts` | Preview-by-default substitution across a pathspec; `--take` writes through `writeGuard` |
 | `lib/fileList.ts` | `listRepoFiles`: pathspec → file list via `git ls-files`, with a caller-supplied cap. Shared by `each` and `replace` |
@@ -109,7 +111,7 @@ Paths are relative to this directory.
 
 Tests: one in-process suite per pure module
 (`argv`, `batchPlan`, `conflictResolver`, `diffCounting`, `eachPlan`, `fallowReport`,
-`gatePlan`, `gitArgs`, `grepQuery`, `outputShaping`, `redaction`, `replacePlan`, `sectionSlice`,
+`gatePlan`, `gitArgs`, `grepQuery`, `ignoreQuery`, `outputShaping`, `redaction`, `replacePlan`, `sectionSlice`,
 `shellSafety`, `writeGuard`),
 plus `__tests__/shgd.test.ts` — subprocess through the same vendored `tsx`, for end-to-end
 wiring and the guards only.
@@ -217,6 +219,13 @@ entry can name, so it prompted on every rename.
   regex, where `a|b` and `x+` are literals — an alternation pattern silently returns
   "no matches" instead of erroring. Extended is what a caller typing a regex expects,
   and it matches the JS syntax used by every `--grep=` shaping option.
+- **`shgd ignored` exists because grepping `.gitignore` answers a different question.**
+  The deciding pattern may live in a nested `.gitignore`, in `.git/info/exclude` or in
+  the global `core.excludesFile`, and a later negation can overturn an earlier match —
+  so a grep hit is not proof and a grep miss is not absence. `git check-ignore` resolves
+  the rules and names the file and line, which is the whole point of the verb.
+  `--verbose` is always paired with `--non-matching` for the same reason: a path with no
+  matching rule must come back as an explicit "not ignored", not as silence.
 - **`--take` is the only write flag, on every verb that writes.** `replace` previews by
   default and writes only with `--take`, rather than inventing a `--dry-run` that would
   make writing the default. Two consequences fall out for free: `batchPlan`'s existing

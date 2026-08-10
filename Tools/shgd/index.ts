@@ -15,6 +15,7 @@ import { each } from './verbs/each';
 import { fallow } from './verbs/fallow';
 import { grep } from './verbs/grep';
 import { history, show } from './verbs/history';
+import { ignored } from './verbs/ignored';
 import { read, section } from './verbs/read';
 import { replace } from './verbs/replace';
 import { status } from './verbs/status';
@@ -37,6 +38,7 @@ const Verbs: Readonly<Record<string, VerbHandler>> = Object.freeze({
   fallow,
   grep,
   history,
+  ignored,
   read,
   replace,
   section,
