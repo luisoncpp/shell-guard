@@ -105,6 +105,7 @@ Paths are relative to this directory.
 | `verbs/conflicts.ts` | Conflict listing, hunk display, `--audit`, `--take` orchestration |
 | `shgd`, `shgd.cmd` | PATH shims; run `index.ts` through the vendored `tsx`, resolved from the script's own directory rather than the cwd |
 | `package.json` | This directory's private manifest — the `tsx` dependency, kept out of the host's |
+| `lessons-learned/` | Counter-intuitive facts about this tool's own structure — see [Lessons learned](#lessons-learned) |
 
 Tests: one in-process suite per pure module
 (`argv`, `batchPlan`, `conflictResolver`, `diffCounting`, `eachPlan`, `fallowReport`,
@@ -288,6 +289,17 @@ entry can name, so it prompted on every rename.
 - **`ExpectedFallowSchemaVersion` must track the pinned `fallow` version.** Bumping
   fallow without checking the field names in `lib/fallowReport.ts` prints a warning
   rather than wrong numbers.
+
+## Lessons learned
+
+Counter-intuitive facts discovered building this tool. They travel with the folder and
+name nothing outside it — read the relevant one before touching that area.
+
+| Entry | What it saves you |
+|-------|-------------------|
+| [fallow-crap-penalises-extraction.md](lessons-learned/fallow-crap-penalises-extraction.md) | Why the [pure/IO split](#pureio-split--the-load-bearing-structure) exists: a coverage-weighted CRAP gate punishes *uncovered* complexity, extraction raises the finding count while lowering severity (read severity, not count), and a subprocess test earns **no** coverage by any config |
+| [crlf-breaks-dollar-anchored-regexes.md](lessons-learned/crlf-breaks-dollar-anchored-regexes.md) | Why `lib/lines.ts` splits on `/\r?\n/`: JS `.` does not match `\r`, so on a CRLF file every `$`-anchored regex silently matches nothing — the real `read --redact` failure. Plus why `conflictResolver` keeps the naive split |
+| [compound-shell-lines-not-programs-trigger-prompts.md](lessons-learned/compound-shell-lines-not-programs-trigger-prompts.md) | The original permission measurement (59 transcript commands) and which half of it expired; why output shaping is built in rather than piped, and why `shgd exec "<pipeline>"` must never exist |
 
 ## Host project coupling
 

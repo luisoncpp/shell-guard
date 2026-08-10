@@ -74,7 +74,7 @@ function marker(introduced: boolean | undefined): string {
 
 function complexityLines(findings: readonly ComplexityFinding[]): string[] {
   if (findings.length === 0) return [];
-  const lines = ['', 'complexity findings (read severity, not the count — see docs/lessons-learned/fallow-crap-penalises-extraction.md):'];
+  const lines = ['', 'complexity findings (read severity, not the count — see Tools/shgd/lessons-learned/fallow-crap-penalises-extraction.md):'];
   for (const finding of findings) {
     lines.push(`  ${marker(finding.introduced)} ${finding.severity} ${finding.path}:${finding.line} ${finding.name} cyclomatic=${finding.cyclomatic} cognitive=${finding.cognitive}`);
   }
