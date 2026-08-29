@@ -329,6 +329,39 @@ protected for the same write→execute reason.
 Do not put the file under `.claude/`. Quality gates are host-repo policy,
 shared by every agent skill, not Claude-Code-only settings.
 
+## Does the host need a `package.json`?
+
+**No, except for `check` when there is no `.shgd.json`, and except for `fallow`.**
+The rest of the verb surface is git. This repo is already a proof: the only
+`package.json` in the tree is `Tools/shgd/package.json` (the tool's own `tsx`
+install). There is no host manifest at the repo root.
+
+| What | Reads host `package.json`? | Needs a Node/npm host? |
+|---|---|---|
+| `check` with no `.shgd.json` | **Yes**, for `--project=<dir>` script discovery. Root gates spawn `npx`/`npm` without opening the file, but those commands fail in a tree that has no npm scripts. | Yes, that is the default toolchain |
+| `check` with `.shgd.json` | **No.** The file replaces discovery. A tree of only `.cpp` / `.h` is enough. | Only if a gate *names* `npm`/`npx` |
+| `fallow` | **No**, but it looks for `node_modules/.bin/fallow` (and `node_modules/fallow/package.json`) then runs `npx fallow`. Missing install is a refusal, not a download. | Yes. Unreal does not call this verb |
+| `writeGuard` | No. The basename `package.json` is protected *if present*, same as `.npmrc`. Absence is fine. | No |
+| `status`, `diff`, `grep`, `history`, `each`, `replace`, `read`, `section`, `conflicts`, `ignored`, `where`, `batch` | No | No. `git` plus the shims |
+| `diffstat` | No | No git-wise. **Source-line counts** only credit `.ts` / `.tsx` / `.mts` / `.cts` / `.rs` and skip paths containing `__tests__`. An Unreal diff that is all `.cpp` prints churn by file but **0 source lines** until `sourceExtensions` is configurable |
+
+`runTool` in `lib/run.ts` is typed `'npm' \| 'npx'` and is only called from
+`check` and `fallow`. Every other verb uses `runGit`. That is the whole
+host-npm surface.
+
+**`Tools/shgd/package.json` is not the host's.** The shims run `index.ts`
+through a vendored `tsx` next to the tool. Dropping `Tools/shgd/` into an
+Unreal repo still needs **Node on PATH** and one `npm install` *inside that
+folder* so `tsx` exists. It does not need a root `package.json`, a
+`node_modules` at repo root, or npm scripts. That install is documented
+under [Installing](../README.md#installing) and is unchanged by this plan.
+
+The leftover Node-shaped knobs that are *not* `package.json` — and that an
+Unreal drop-in still feels — are `DefaultDiffBase` (`origin/develop`),
+`SourceExtensions` / `__tests__` in `diffstat`, and the `fallow` verb
+sitting in the table. The first two move into `.shgd.json` in phase 4. The
+third stays and refuses cleanly; the host skill simply does not mention it.
+
 ## `fallow`, `diffstat`, skill text
 
 | Verb | With config | Without config |
