@@ -55,8 +55,8 @@ the quality of the code; do not chase it to zero.
 
 | Layer | Files | Coverage |
 |-------|-------|----------|
-| Pure rules | `lib/argv.ts`, `lib/batchPlan.ts`, `lib/conflictResolver.ts`, `lib/constants.ts`, `lib/diffCounting.ts`, `lib/eachPlan.ts`, `lib/fallowReport.ts`, `lib/gatePlan.ts`, `lib/gitArgs.ts`, `lib/grepQuery.ts`, `lib/lines.ts`, `lib/outputShaping.ts`, `lib/redaction.ts`, `lib/replacePlan.ts`, `lib/sectionSlice.ts`, `lib/shellSafety.ts`, `lib/usage.ts`, `lib/verb.ts` | ~100% in-process |
-| IO | `lib/run.ts`, `lib/paths.ts`, `lib/fileList.ts`, `lib/repoFile.ts`, `lib/writeGuard.ts`, `verbs/*.ts`, `index.ts` | subprocess only (uncredited) |
+| Pure rules | `lib/argv.ts`, `lib/batchPlan.ts`, `lib/checkConfig.ts`, `lib/conflictResolver.ts`, `lib/constants.ts`, `lib/diffCounting.ts`, `lib/eachPlan.ts`, `lib/fallowReport.ts`, `lib/gatePlan.ts`, `lib/gitArgs.ts`, `lib/grepQuery.ts`, `lib/lines.ts`, `lib/outputShaping.ts`, `lib/redaction.ts`, `lib/replacePlan.ts`, `lib/sectionSlice.ts`, `lib/shellSafety.ts`, `lib/usage.ts`, `lib/verb.ts` | ~100% in-process |
+| IO | `lib/run.ts`, `lib/paths.ts`, `lib/fileList.ts`, `lib/loadShgdConfig.ts`, `lib/repoFile.ts`, `lib/writeGuard.ts`, `verbs/*.ts`, `index.ts` | subprocess only (uncredited) |
 
 **A new rule belongs in a pure module.** Putting it in a verb costs coverage,
 testability, and a complexity finding.
@@ -77,7 +77,9 @@ Paths are relative to this directory.
 | `lib/grepQuery.ts` | **Pure.** `git grep` argument construction (pattern behind `-e`), output reduction, `keepContainedLines` (drops hits git found through a link out of the repo) |
 | `lib/ignoreQuery.ts` | **Pure.** `git check-ignore` argument construction (`--verbose` always paired with `--non-matching`), `parseCheckIgnore` → one verdict per path, `formatVerdicts` |
 | `lib/eachPlan.ts` | **Pure.** `resolveEachRequest` (one mode only), `summariseFile` |
-| `lib/gatePlan.ts` | **Pure.** The `Gate` shape, `RootGates`, `assertWorkspaceName` / `assertTestPath` (shell-safe path grammars), `workspaceGates` (the fixed per-workspace gate template) |
+| `lib/checkConfig.ts` | **Pure.** Admits `.shgd.json` v1: gate names, command spawn kind (`npm` / PATH / repo), argument grammars, optional `diffBase` and `sourceExtensions` |
+| `lib/loadShgdConfig.ts` | IO. Confined read of `.shgd.json` (root or `--project` dir); missing file is undefined, invalid file is a refusal |
+| `lib/gatePlan.ts` | **Pure.** Default `RootGates` / `workspaceGates`, `assertWorkspaceName` / `assertTestPath`; imports the `Gate` shape from `checkConfig` |
 | `lib/replacePlan.ts` | **Pure.** `parseRules` (positional pairs), `buildMatcher` (literal escaping, word boundaries, regex), `applyRules` per line with terminators preserved |
 | `lib/lines.ts` | **Pure.** `splitLines` on `/\r?\n/` — see the CRLF invariant below |
 | `lib/redaction.ts` | **Pure.** `redactLine`: connection-string passwords, bearer tokens, secret-looking assignment values (bare or JSON-quoted); `redactLines` also masks PEM key bodies, which no per-line rule can spot |
@@ -87,12 +89,12 @@ Paths are relative to this directory.
 | `lib/conflictResolver.ts` | **Pure.** `classifyLine` marker state machine, `countHunks`, `resolveLines`, `parseSpec` |
 | `lib/diffCounting.ts` | **Pure.** `countSubstantiveLines(diffText)`, `parseNumstat`, `rankByChurn`, `totalChurn`, `isCountableSource` |
 | `lib/fallowReport.ts` | **Pure.** `reduceAudit`/`reduceDupes`/`deadCodeLines`/`newGroupLines` → printable lines + pass/fail, `schemaWarning`, `parseSection` |
-| `lib/run.ts` | `runGit` (shell:false), `runTool` (shell:true for `npm.cmd`/`npx.cmd`, arguments allowlisted first), `resolveExecutable` (absolute path from `PATH`, cwd never searched), `gitLines` |
+| `lib/run.ts` | `runGit` (shell:false), `runTool` (shell:true for `npm.cmd`/`npx.cmd`, arguments allowlisted first, optional cwd), `runPathTool` / `runRepoTool` (shell:false, optional cwd), `resolveExecutable` (absolute path from `PATH`, cwd never searched), `gitLines` |
 | `lib/paths.ts` | Cached `repoRoot()` via `git rev-parse --show-toplevel`, `tmpDir()` (`SHGD_TMP` or os tmp), `backupDir()`, `realPath()` and the containment helpers built on it |
 | `lib/repoFile.ts` | The single **read** choke point for a caller-named path: `resolveInsideRepo`, `readRepoText`/`readRepoBuffer`/`readRepoLines` |
 | `lib/writeGuard.ts` | The single write choke point: toggle, containment, `findProtectedSegment`, pre-image copy, then write |
 | `verbs/batch.ts` | Runs planned steps through the injected dispatcher, labels each, applies per-step shaping |
-| `verbs/check.ts` | Resolves `--project` to a directory, answers `gatePlan`'s filesystem questions (tsconfig present, package scripts), runs the gates, per-gate status + failing tail |
+| `verbs/check.ts` | Reads `.shgd.json` when present (else `RootGates` / `workspaceGates`), `--list`, filters by `--only`/`--quick`/`--test`, spawns each gate with the right cwd and spawn path |
 | `verbs/fallow.ts` | Invokes `npx fallow --format json` — only if `fallow` is already installed in the repo — and delegates all formatting to `fallowReport` |
 | `verbs/diffstat.ts` | Captures `git diff --numstat` / `-U0`, delegates counting to `diffCounting` |
 | `verbs/diff.ts` | `git diff` over caller-supplied refs in a chosen mode |
@@ -110,7 +112,7 @@ Paths are relative to this directory.
 | `lessons-learned/` | Counter-intuitive facts about this tool's own structure — see [Lessons learned](#lessons-learned) |
 
 Tests: one in-process suite per pure module
-(`argv`, `batchPlan`, `conflictResolver`, `diffCounting`, `eachPlan`, `fallowReport`,
+(`argv`, `batchPlan`, `checkConfig`, `conflictResolver`, `diffCounting`, `eachPlan`, `fallowReport`,
 `gatePlan`, `gitArgs`, `grepQuery`, `ignoreQuery`, `outputShaping`, `redaction`, `replacePlan`, `sectionSlice`,
 `shellSafety`, `writeGuard`),
 plus `__tests__/shgd.test.ts` — subprocess through the same vendored `tsx`, for end-to-end
@@ -186,12 +188,13 @@ entry can name, so it prompted on every rename.
 - **Verbs return `VerbResult`; they never print.** Printing and shaping belong to
   `index.ts`. A verb calling `console.log` is invisible to `--tail`/`--grep` and its
   output escapes `batch`'s step labelling.
-- **The set of executable programs is a compile-time constant.** `lib/gatePlan.ts` is
-  the only place a program name appears (`npx tsc`, `npm run`); `--project` supplies a
-  *directory* and `--test` a *path*, never a command. The npm script it runs must
-  already exist in that workspace's `package.json`, and both values must pass their
-  grammar — `runTool` uses a shell on Windows, so an unvalidated one there makes one
-  allow rule cover arbitrary execution. It did, for `--test`.
+- **The default gate table is a compile-time constant; more programs come only from
+  write-protected `.shgd.json`.** `lib/gatePlan.ts` holds today's `RootGates`
+  (`npx tsc`, `npm run`); a root or workspace `.shgd.json` replaces that table when
+  present. `--project` supplies a *directory*, `--only` a gate *name*, `--test` a
+  *selector* — never a command on the CLI. npm/npx arguments and both path grammars
+  must pass their admission rules before spawn; `runTool` uses a shell on Windows, so
+  an unvalidated value there makes one allow rule cover arbitrary execution.
 - **`batch` composes verbs, never programs.** No step may write, nest, or name anything
   outside the verb table. `shgd exec "<pipeline>"` must never exist: under a blanket
   `Bash(shgd:*)` rule it would be an unrestricted shell.
@@ -264,9 +267,9 @@ entry can name, so it prompted on every rename.
   case-insensitive and Win32 strips trailing dots from a path component, so `.GIT/`,
   `.Git/` and `.git./` all open `.git/`. A case-sensitive `Set` lookup let any of
   those spellings walk past the entire list.
-- **`package.json`, the lockfiles and `.github/` are protected too.** Not because
+- **`package.json`, `.shgd.json`, the lockfiles and `.github/` are protected too.** Not because
   editing them is dangerous in itself, but because of the write→execute chain:
-  `shgd check` runs whatever `package.json` declares, so one pre-approved
+  `shgd check` runs whatever they declare, so one pre-approved
   `replace --take` would make the next pre-approved `shgd check` arbitrary execution.
 - **`runGit` must never use a shell.** It receives caller-supplied file paths.
   `runTool` may use one only because Node refuses to spawn `npm.cmd`/`npx.cmd`
@@ -312,13 +315,13 @@ name nothing outside it — read the relevant one before touching that area.
 
 ## Host project coupling
 
-The tool is not yet configuration-driven. Dropping `Tools/shgd/` into another repo
-requires editing these, and nothing else:
+Dropping `Tools/shgd/` into another repo requires editing these, and nothing else:
 
 | What | Where | Why it is project-specific |
 |------|-------|----------------------------|
-| Root gate table | `lib/gatePlan.ts` — `RootGates` | Hardcodes the repo-root npm script names (`lint`, `test:jest`). Sub-packages need no edit: `--project=<dir>` discovers them |
-| Default diff base | `lib/constants.ts` — `DefaultDiffBase` | `origin/develop`; a trunk-based repo wants `origin/main` |
+| Root gate table | `.shgd.json` at repo root (optional — absent keeps `RootGates` in `lib/gatePlan.ts`) | Names the quality gates `shgd check` runs. Write-protected like `package.json`. Sub-packages can have their own file or keep script discovery via `--project=<dir>` |
+| Default diff base | `.shgd.json` `diffBase` or `lib/constants.ts` — `DefaultDiffBase` | `origin/develop`; a trunk-based repo wants `origin/main` |
+| Source extensions | `.shgd.json` `sourceExtensions` or `lib/constants.ts` — `SourceExtensions` | `diffstat` line counts; Unreal wants `.cpp` / `.h` / `.cs` |
 | Quality-tool pin | `lib/constants.ts` — `ExpectedFallowSchemaVersion` | Must track the host's pinned `fallow` version. A repo without `fallow` should drop `verbs/fallow.ts` and its entry in the verb table |
 | Entry point | nothing — see [Installing](#installing) | The shims vendor their own `tsx`; a host `"shgd"` script is optional sugar |
 | Type checking | host `tsconfig.jest.json` `include` | The root tsconfig typically covers only app sources, so these files are type-checked by the Jest config alone |
@@ -326,7 +329,39 @@ requires editing these, and nothing else:
 | Agent skill | host `.claude/skills/shgd/SKILL.md` | Claude Code discovers skills only there, so the skill file cannot live in this directory. Copy it into the consuming repo |
 | Allow rules | host `.claude/settings.local.json` | Gitignored, so every clone needs its own copy — see [Allowing `shgd` in Claude Code](#allowing-shgd-in-claude-code) |
 
-Nothing under `lib/` other than `constants.ts` contains a project-specific value.
+Example `.shgd.json` for an Unreal project (at repo root or under `--project=MyGame`):
+
+```json
+{
+  "schemaVersion": 1,
+  "diffBase": "origin/main",
+  "sourceExtensions": [".h", ".cpp", ".hpp", ".c", ".cs"],
+  "gates": [
+    {
+      "name": "clang-tidy",
+      "command": "clang-tidy",
+      "args": ["-p", "compile_commands.json"],
+      "inQuickRun": true
+    },
+    {
+      "name": "lizard",
+      "command": "lizard",
+      "args": ["Source", "--CCN", "15", "--length", "100"],
+      "inQuickRun": true
+    },
+    {
+      "name": "automation",
+      "command": "Tools/RunAutomationTests.sh",
+      "args": [],
+      "inQuickRun": false,
+      "role": "test"
+    }
+  ]
+}
+```
+
+Nothing under `lib/` other than `constants.ts` contains a project-specific value unless
+you commit `.shgd.json`.
 
 ## Installing
 

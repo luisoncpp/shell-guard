@@ -5,6 +5,7 @@ import { assertSafeGitArgument, buildLogArgs } from '../lib/gitArgs';
 import { capLines } from '../lib/outputShaping';
 import { gitLines, runGit } from '../lib/run';
 import { ok, type VerbResult } from '../lib/verb';
+import { tryReadRootShgdConfig } from '../lib/loadShgdConfig';
 
 const OneLineFormat = '%h %ad %s';
 const ShortDate = ['--date=short'];
@@ -48,7 +49,8 @@ export function history(args: ParsedArgs): VerbResult {
   const find = args.options.get('find');
   if (find !== undefined) return findPath(find);
   if (args.flags.has('commits') || args.options.has('commits')) {
-    return perCommitBreakdown(args.options.get('commits') ?? DefaultDiffBase);
+    const config = tryReadRootShgdConfig();
+    return perCommitBreakdown(args.options.get('commits') ?? config?.diffBase ?? DefaultDiffBase);
   }
   throw new Error('usage: shgd history --file=<path> | --commits[=<base>] | --find=<pathspec>');
 }

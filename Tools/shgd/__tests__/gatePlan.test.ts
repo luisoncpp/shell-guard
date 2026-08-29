@@ -40,15 +40,15 @@ describe("assertTestPath", () => {
 describe("workspaceGates", () => {
   it("builds tsc, lint and test gates from what the workspace actually has", () => {
     expect(workspaceGates("server", { hasTsconfig: true, scripts: ["lint", "test"] })).toEqual([
-      { name: "tsc", command: "npx", args: ["tsc", "--noEmit", "-p", "server/tsconfig.json"], inQuickRun: true },
-      { name: "lint", command: "npm", args: ["--prefix", "server", "run", "lint", "--silent"], inQuickRun: true },
-      { name: "jest", command: "npm", args: ["--prefix", "server", "run", "test", "--silent"], inQuickRun: false },
+      { name: "tsc", spawn: { kind: "npm", command: "npx" }, args: ["tsc", "--noEmit", "-p", "server/tsconfig.json"], inQuickRun: true },
+      { name: "lint", spawn: { kind: "npm", command: "npm" }, args: ["--prefix", "server", "run", "lint", "--silent"], inQuickRun: true },
+      { name: "jest", spawn: { kind: "npm", command: "npm" }, args: ["--prefix", "server", "run", "test", "--silent"], inQuickRun: false, role: "test" },
     ]);
   });
 
   it("omits gates the workspace cannot run", () => {
     expect(workspaceGates("admin", { hasTsconfig: true, scripts: [] })).toEqual([
-      { name: "tsc", command: "npx", args: ["tsc", "--noEmit", "-p", "admin/tsconfig.json"], inQuickRun: true },
+      { name: "tsc", spawn: { kind: "npm", command: "npx" }, args: ["tsc", "--noEmit", "-p", "admin/tsconfig.json"], inQuickRun: true },
     ]);
   });
 
@@ -60,6 +60,11 @@ describe("workspaceGates", () => {
   it("only the test gate is outside a --quick run", () => {
     const gates = workspaceGates("web", { hasTsconfig: true, scripts: ["lint", "test"] });
     expect(gates.filter((gate) => gate.inQuickRun).map((gate) => gate.name)).toEqual(["tsc", "lint"]);
+  });
+
+  it("marks jest with role test", () => {
+    const gates = workspaceGates("web", { hasTsconfig: false, scripts: ["test"] });
+    expect(gates[0].role).toBe("test");
   });
 
   it("refuses a directory with nothing to check", () => {

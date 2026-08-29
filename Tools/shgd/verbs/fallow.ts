@@ -9,6 +9,7 @@ import { repoRoot } from '../lib/paths';
 import { readRepoText } from '../lib/repoFile';
 import { runTool } from '../lib/run';
 import type { VerbResult } from '../lib/verb';
+import { tryReadRootShgdConfig } from '../lib/loadShgdConfig';
 
 const LocalFallow = ['node_modules/.bin/fallow', 'node_modules/.bin/fallow.cmd', 'node_modules/fallow/package.json'];
 
@@ -47,9 +48,10 @@ function dupes(args: ParsedArgs): VerbResult {
 }
 
 function audit(args: ParsedArgs): VerbResult {
+  const config = tryReadRootShgdConfig();
   // The base reaches runTool, which uses a shell on Windows. assertSafeGitArgument is
   // the wrong guard for a shell sink — it only refuses a leading dash.
-  const base = assertShellSafeRef(args.positional[1] ?? DefaultDiffBase, 'base');
+  const base = assertShellSafeRef(args.positional[1] ?? config?.diffBase ?? DefaultDiffBase, 'base');
   const section = parseSection(args.options.get('section') ?? 'complexity');
   const report = parseFallowJson(['audit', '--changed-since', base]);
   return emit(reduceAudit(report as never, section));

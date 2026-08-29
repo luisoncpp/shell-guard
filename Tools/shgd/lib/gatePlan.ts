@@ -1,12 +1,8 @@
 // @Architecture(type=Module, descriptionShort="Gate table construction for check", descriptionLong="Pure rules behind `shgd check --project`: the Gate shape, the strict workspace-name and test-path grammars, and the fixed gate template a workspace directory expands into. Kept dependency-free so the admission rules are unit-testable; verbs/check.ts supplies the filesystem answers this module takes as booleans.")
+import type { Gate } from './checkConfig';
 import { isRepoRelativePath } from './shellSafety';
 
-export interface Gate {
-  name: string;
-  command: 'npm' | 'npx';
-  args: string[];
-  inQuickRun: boolean;
-}
+export type { Gate, GateSpawn, ShgdConfig } from './checkConfig';
 
 /**
  * Both of these reach runTool, which uses a shell on Windows, so both are allowlists
@@ -29,9 +25,15 @@ export function assertTestPath(value: string): string {
 }
 
 export const RootGates: readonly Gate[] = Object.freeze([
-  { name: 'tsc', command: 'npx', args: ['tsc', '--noEmit'], inQuickRun: true },
-  { name: 'lint', command: 'npm', args: ['run', 'lint', '--silent'], inQuickRun: true },
-  { name: 'jest', command: 'npm', args: ['run', 'test:jest', '--silent'], inQuickRun: false },
+  { name: 'tsc', spawn: { kind: 'npm', command: 'npx' }, args: ['tsc', '--noEmit'], inQuickRun: true },
+  { name: 'lint', spawn: { kind: 'npm', command: 'npm' }, args: ['run', 'lint', '--silent'], inQuickRun: true },
+  {
+    name: 'jest',
+    spawn: { kind: 'npm', command: 'npm' },
+    args: ['run', 'test:jest', '--silent'],
+    inQuickRun: false,
+    role: 'test',
+  },
 ]);
 
 export interface WorkspaceFacts {
@@ -50,7 +52,7 @@ export function workspaceGates(name: string, facts: WorkspaceFacts): readonly Ga
   if (facts.hasTsconfig) {
     gates.push({
       name: 'tsc',
-      command: 'npx',
+      spawn: { kind: 'npm', command: 'npx' },
       args: ['tsc', '--noEmit', '-p', `${name}/tsconfig.json`],
       inQuickRun: true,
     });
@@ -58,7 +60,7 @@ export function workspaceGates(name: string, facts: WorkspaceFacts): readonly Ga
   if (facts.scripts.includes('lint')) {
     gates.push({
       name: 'lint',
-      command: 'npm',
+      spawn: { kind: 'npm', command: 'npm' },
       args: ['--prefix', name, 'run', 'lint', '--silent'],
       inQuickRun: true,
     });
@@ -67,9 +69,10 @@ export function workspaceGates(name: string, facts: WorkspaceFacts): readonly Ga
   if (testScript) {
     gates.push({
       name: 'jest',
-      command: 'npm',
+      spawn: { kind: 'npm', command: 'npm' },
       args: ['--prefix', name, 'run', testScript, '--silent'],
       inQuickRun: false,
+      role: 'test',
     });
   }
   if (gates.length === 0) {

@@ -11,15 +11,15 @@ const ProtectedDirectories = new Set([
 
 /**
  * The manifests and lockfiles are here for the write→execute chain: `shgd check` runs
- * whatever `package.json` declares, so a rewrite of it under one pre-approved call
- * turns the next pre-approved call into arbitrary execution. Editing them is a job
- * for the edit tools, where the permission layer still applies.
+ * whatever `package.json` or `.shgd.json` declares, so a rewrite of either under one
+ * pre-approved call turns the next pre-approved call into arbitrary execution. Editing
+ * them is a job for the edit tools, where the permission layer still applies.
  */
 const ProtectedFiles = new Set([
   '.gitconfig', '.gitmodules', '.npmrc', '.yarnrc', '.yarnrc.yml',
   '.mcp.json', '.claude.json', '.envrc', '.pre-commit-config.yaml',
   'package.json', 'package-lock.json', 'npm-shrinkwrap.json',
-  'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb',
+  'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '.shgd.json',
 ]);
 
 const TrailingDotsOrSpaces = /[. ]+$/;
