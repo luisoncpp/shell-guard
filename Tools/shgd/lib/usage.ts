@@ -32,9 +32,10 @@ Editing
                                      --take  write; without it this is a preview
 
 Gates and quality
-  shgd check [--quick]                 tsc --noEmit, npm run lint, npm run test:jest
+  shgd check [--quick]                 runs gates from .shgd.json or the default table
+                                     shgd check --list shows the resolved gates
                                      --project=<dir> gates one workspace directory
-                                     --only=tsc|lint|jest  --test=<path>
+                                     --only=<gate>  --test=<path>
   shgd fallow [audit [base] | dupes]   introduced-vs-inherited report
                                      --section=complexity|dead-exports|all
                                      dupes --baseline=<file> shows only new groups

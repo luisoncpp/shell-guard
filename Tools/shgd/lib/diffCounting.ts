@@ -12,9 +12,9 @@ export interface ChurnEntry extends LineCounts {
   filePath: string;
 }
 
-export function isCountableSource(filePath: string): boolean {
+export function isCountableSource(filePath: string, extensions: readonly string[] = SourceExtensions): boolean {
   if (filePath.includes(TestPathFragment)) return false;
-  return SourceExtensions.some((extension) => filePath.endsWith(extension));
+  return extensions.some((extension) => filePath.endsWith(extension));
 }
 
 function diffLineKind(line: string): keyof LineCounts | null {
@@ -24,7 +24,7 @@ function diffLineKind(line: string): keyof LineCounts | null {
   return null;
 }
 
-export function countSubstantiveLines(diffText: string): LineCounts {
+export function countSubstantiveLines(diffText: string, extensions: readonly string[] = SourceExtensions): LineCounts {
   const counts: LineCounts = { added: 0, deleted: 0 };
   let currentFile = '';
   for (const line of diffText.split('\n')) {
@@ -33,7 +33,7 @@ export function countSubstantiveLines(diffText: string): LineCounts {
       continue;
     }
     const kind = diffLineKind(line);
-    if (!kind || !isCountableSource(currentFile)) continue;
+    if (!kind || !isCountableSource(currentFile, extensions)) continue;
     if (CommentOrBlankPattern.test(line.slice(1))) continue;
     counts[kind] += 1;
   }

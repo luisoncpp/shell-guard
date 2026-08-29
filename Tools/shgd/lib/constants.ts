@@ -35,7 +35,7 @@ export const SourceExtensions = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.
  */
 export const KnownFlags: ReadonlySet<string> = new Set([
   'audit', 'cached', 'cat', 'commits', 'count', 'count-lines', 'files-only', 'first-line',
-  'help', 'name-status', 'no-index', 'no-write', 'numstat', 'patch', 'quick', 'redact', 'regex',
+  'help', 'list', 'name-status', 'no-index', 'no-write', 'numstat', 'patch', 'quick', 'redact', 'regex',
   'show', 'stat', 'stop-on-fail', 'take', 'untracked', 'word',
 ]);
 

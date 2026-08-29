@@ -341,7 +341,7 @@ describe("shgd replace end to end", () => {
     expect(preview.output).toContain("preview only");
     expect(readFixture("rename.md")).toBe(Doc);
 
-    const written = runCli([...spec, "--take"]);
+    const written = runCli(["replace", "activeItems", "liveItems", "--word", "--take", "--", relative]);
     expect(written.status).toBe(0);
     expect(readFixture("rename.md")).toBe("`liveItems` and pendingItems, plus activeItemsCount\n");
     const backupLine = written.output.split("\n").find((line) => line.includes("pre-image:"));
@@ -381,6 +381,30 @@ describe("shgd replace end to end", () => {
     const result = runCli(["batch", "replace a b --take -- Tools/shgd/__fixtures__"]);
     expect(result.status).toBe(1);
     expect(result.output).toContain("may not run inside batch");
+  });
+});
+
+describe("shgd check", () => {
+  it("lists the default gates when no .shgd.json is present", () => {
+    const result = runCli(["check", "--list"]);
+    expect(result.status).toBe(0);
+    expect(result.output).toContain("tsc  spawn=npx  quick=yes");
+    expect(result.output).toContain("lint  spawn=npm  quick=yes");
+    expect(result.output).toContain("jest  spawn=npm  quick=no  role=test");
+  });
+
+  it("refuses an unknown --only gate name", () => {
+    const result = runCli(["check", "--only=clang-tidy"]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("--only=clang-tidy is not a gate");
+  });
+
+  it("refuses replace --take on .shgd.json", () => {
+    const relative = writeFixture(".shgd.json", '{"schemaVersion":1,"gates":[]}');
+    const result = runCli(["replace", "schemaVersion", "schemaVersionX", "--take", "--", relative]);
+    expect(result.status).toBe(1);
+    expect(result.output).toContain("protected path");
+    expect(readFixture(".shgd.json")).toContain('"schemaVersion":1');
   });
 });
 

@@ -196,23 +196,21 @@ rather than silently running something else.
 
 \### Gates and quality
 
-\- `shgd check \[--quick]` — `npx tsc --noEmit`, `npm run lint`, `npm run test:jest`, with
+\- `shgd check \[--quick]` — runs quality gates from `.shgd.json` when present, else the
 
-&#x20; per-gate PASS/FAIL and the failing tail. `--quick` skips jest.
+&#x20; default Node table (`tsc`, `lint`, `jest`). Per-gate PASS/FAIL and the failing tail.
 
-&#x20; `--only=tsc|lint|jest` and `--test=<path>` give a focused run.
+&#x20; Run `shgd check --list` first to see gate names; `--only=<gate>` picks one.
 
-&#x20; `--project=<dir>` gates one workspace directory instead of the repo root: its gates
+&#x20; `--test=<path>` targets the gate with `role: test` (repo-relative selector).
 
-&#x20; are derived from what that directory has — `tsc` if it holds a `tsconfig.json`,
+&#x20; `--project=<dir>` is a **directory** inside the repo: that folder's `.shgd.json` wins,
 
-&#x20; `lint`/`jest` if its `package.json` declares a `lint` / `test:jest` \(or `test`\)
+&#x20; else gates are derived from its `tsconfig.json` / `package.json` scripts. Never pass a
 
-&#x20; script. It takes a \*\*directory\*\*, never a command, and the root `lint` may already
+&#x20; program name to `shgd` — configure tools in `.shgd.json` instead.
 
-&#x20; cover a workspace's sources.
-
-\- `shgd fallow \[audit \[base] | dupes]` — the introduced-vs-inherited report.
+\- `shgd fallow \[audit \[base] | dupes]` — optional, Node-specific: the introduced-vs-inherited report.
 
 &#x20; `--section=complexity` (default) `|dead-exports|all`. `dupes --baseline=<file>`
 

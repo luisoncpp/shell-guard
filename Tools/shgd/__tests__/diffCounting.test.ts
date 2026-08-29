@@ -13,6 +13,12 @@ describe("isCountableSource", () => {
     expect(isCountableSource("src-tauri/src/lib.rs")).toBe(true);
   });
 
+  it("accepts custom extensions when provided", () => {
+    const cpp = [".h", ".cpp", ".cs"];
+    expect(isCountableSource("Source/Foo.cpp", cpp)).toBe(true);
+    expect(isCountableSource("src/a.ts", cpp)).toBe(false);
+  });
+
   it("rejects tests and non-source files", () => {
     expect(isCountableSource("src/__tests__/a.test.ts")).toBe(false);
     expect(isCountableSource("docs/a.md")).toBe(false);
@@ -60,6 +66,13 @@ describe("countSubstantiveLines", () => {
   it("ignores non-source files entirely", () => {
     const docs = ["+++ b/docs/a.md", "+# heading", "-# old"].join("\n");
     expect(countSubstantiveLines(docs)).toEqual({ added: 0, deleted: 0 });
+  });
+
+  it("counts custom extensions when provided", () => {
+    const cpp = [".cpp"];
+    const diff = ["+++ b/Source/Foo.cpp", "+int main() { return 0; }"].join("\n");
+    expect(countSubstantiveLines(diff, cpp)).toEqual({ added: 1, deleted: 0 });
+    expect(countSubstantiveLines(diff)).toEqual({ added: 0, deleted: 0 });
   });
 });
 

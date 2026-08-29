@@ -1,8 +1,6 @@
 # Configurable quality gates
 
-Status: **proposal**. Nothing in this file is behaviour yet. It is the plan for
-making `shgd check` (and the related host-coupling knobs) work in an Unreal
-Engine tree without forking `lib/gatePlan.ts`.
+Status: **implemented**. Behaviour matches this plan.
 
 ## Why
 

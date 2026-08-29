@@ -25,6 +25,8 @@ describe("findProtectedSegment", () => {
     expect(findProtectedSegment("package.json")).toBe("package.json");
     expect(findProtectedSegment("server/package-lock.json")).toBe("package-lock.json");
     expect(findProtectedSegment("pnpm-lock.yaml")).toBe("pnpm-lock.yaml");
+    expect(findProtectedSegment("MyGame/.shgd.json")).toBe(".shgd.json");
+    expect(findProtectedSegment(".shgd.json")).toBe(".shgd.json");
     expect(findProtectedSegment(".github/workflows/ci.yml")).toBe(".github");
   });
 
