@@ -312,8 +312,11 @@ name nothing outside it — read the relevant one before touching that area.
 
 ## Host project coupling
 
-The tool is not yet configuration-driven. Dropping `Tools/shgd/` into another repo
-requires editing these, and nothing else:
+The tool is not yet configuration-driven. A plan to replace the hardcoded gate
+table with a per-project `.shgd.json` (Node default kept, Unreal / clang-tidy /
+lizard as a config, never a CLI command) is in
+[design/configurable-gates.md](design/configurable-gates.md). Until that ships,
+dropping `Tools/shgd/` into another repo requires editing these, and nothing else:
 
 | What | Where | Why it is project-specific |
 |------|-------|----------------------------|
