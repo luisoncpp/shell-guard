@@ -1,7 +1,7 @@
 ---
 name: shgd
-description: Use when you need to run any shell command that don't modify anything outside the project. It can search, inspect git state or files, run the project's quality gates, get a fallow quality report, branch churn numbers, resolve merge conflicts, or run several repo commands in one round-trip. Read this BEFORE composing any shell line containing a for-loop, command substitution, `awk`, `sed -i`, or inline `node -e`/`python -c` against this repo — no allow rule can name those shapes, so they prompt every time, and `shgd` has a verb that replaces the job.
-argument-hint: "verb (batch | grep | each | read | section | status | diff | history | show | check | fallow | diffstat | conflicts)"
+description: Use when you need to search, inspect git state or files, rename an identifier or substitute text across many files, run the project's quality gates, get a fallow quality report, branch churn numbers, resolve merge conflicts, or run several repo commands in one round-trip. Read this BEFORE composing any shell line containing a for-loop, command substitution, `awk`, `sed -i`, or inline `node -e`/`python -c` against this repo — no allow rule can name those shapes, so they prompt every time, and `shgd` has a verb that replaces the job.
+argument-hint: "verb (batch | grep | each | read | section | replace | status | diff | history | show | ignored | check | fallow | diffstat | conflicts)"
 ---
 
 # shgd — repo work without the shell pipeline
@@ -17,8 +17,8 @@ A `;` on its own is therefore **not** a reason to reach for `shgd batch`. These 
 
 - The line would contain a **for-loop, command substitution, `awk`, `sed -i`, or inline
   `node -e`/`python -c`**. No allow rule can name those shapes, so they prompt every
-  time. Use the verb that replaces the job — `each`, `section`, `grep`, `fallow`,
-  `diffstat`, `conflicts`.
+  time. Use the verb that replaces the job — `each`, `section`, `grep`, `replace`,
+  `fallow`, `diffstat`, `conflicts`.
 - You would **pipe into a program that is not itself allowed**. Use the shaping options
   below instead of `| head`, `| tail`, `| cut`.
 - You would otherwise make **N separate terminal calls**. One `shgd batch` is one
@@ -68,6 +68,8 @@ that order (filter → truncate → head → tail). Use these instead of
 but only if the program on the right is allowed too, and these need no second program.
 
 Options take values **only** as `--key=value`. A bare `--` separates pathspecs.
+There are no short options: a single-dash token like `-n` is rejected, never taken as
+a positional.
 An unrecognised flag or option is an **error**, not a no-op — so a typo tells you
 rather than silently running something else.
 
@@ -80,10 +82,11 @@ rather than silently running something else.
 - `shgd each <pathspec...> --<mode>` — one mode per call: `--cat`, `--first=N`,
   `--first-line`, `--count-lines`, `--count=<regex>`. `--first-line` over a glob is the
   `@Architecture`-header sweep. Note `--first=N`, not `--head=N`: `--head` shapes output.
-- `shgd read <file> [--redact]` — `--redact` masks connection-string passwords and
-  secret-looking assignment values. Use it for anything `.env`-shaped.
-- `shgd section <file> <startRegex> <endRegex>` — replaces `sed -n '/a/,/b/p'`,
-  inclusive of both boundary lines.
+- `shgd read <file> [--redact]` — `--redact` masks connection-string passwords, bearer
+  tokens, PEM key bodies and secret-looking assignment values (bare or JSON-quoted).
+  Use it for anything `.env`-shaped.
+- `shgd section <file> <startRegex> <endRegex> [--redact]` — replaces
+  `sed -n '/a/,/b/p'`, inclusive of both boundary lines.
 
 ### Git state
 - `shgd status` — branch, porcelain changes, untracked, conflicted, in one call.
@@ -95,6 +98,13 @@ rather than silently running something else.
 - `shgd history --find=<pathspec>` — every commit touching a path, across all refs.
   This is how you find a file that no longer exists.
 - `shgd show <ref>:<path>` — a file's contents at a revision.
+- `shgd ignored <path> [path...]` — `git check-ignore`: is the path gitignored, and
+  which file, line and pattern decided it. Grepping `.gitignore` does **not** answer
+  this — the rule can live in a nested `.gitignore`, `.git/info/exclude` or the global
+  `core.excludesFile`, and a later negation can overturn an earlier match. Every queried
+  path gets an explicit verdict, and nothing ignored is exit 0, not exit 1.
+  A **tracked** path always comes back "not ignored"; `--no-index` names the rule that
+  would have matched, which is how you debug a file `git add` picked up unexpectedly.
 
 ### Gates and quality
 - `shgd check [--quick]` — runs quality gates from `.shgd.json` when present, else the
@@ -108,12 +118,33 @@ rather than silently running something else.
   `--section=complexity` (default) `|dead-exports|all`. `dupes --baseline=<file>`
   prints only clone groups absent from a saved snapshot — never hand-diff fingerprints
   in `node -e`. The verb pins `schema_version` (currently **7**) and warns loudly if
-  fallow's shape changes, which a hand-written parser cannot do.
+  fallow's shape changes, which a hand-written parser cannot do. `fallow` must already
+  be a dependency of the repo — the verb refuses rather than let `npx` download and
+  run it — and `<base>` must be a plain ref name, since it reaches a shell.
   Caveat: the finding **count** is not a quality signal. A CRAP-style score punishes
   extraction — splitting one IO verb into a pure rule plus a thin wrapper can raise the
   count while improving the code. Do not drive it to zero.
 - `shgd diffstat [base]` — churn for `base...HEAD` plus non-comment, non-`__tests__`
   source-line counts. Empty usually means `HEAD` equals the base, not an unfetched base.
+
+### Editing
+- `shgd replace <from> <to> [<from> <to> ...] -- <pathspec...>` — this is `sed -i`, and
+  it is the reason you should not reach for `sed -i`. Rules are **positional pairs**,
+  applied in order, **within a line**, and **literally** unless you say otherwise —
+  so `a.b(c)` matches that text, not a regex. Pathspecs come after the `--`, and a
+  call without one is a usage error rather than a guess.
+  `--word` matches whole words only: this is the identifier-rename mode, and it is
+  what keeps `activeItems` → `liveItems` from mangling `activeItemsCount`.
+  `--regex` treats `<from>` as a regex with `$1` available in `<to>`.
+  **Preview is the default.** You get per-file before/after lines and a per-rule match
+  count; nothing is written until you re-run the same command with `--take`. Read the
+  preview — a rename that hits a file you did not expect is the signal to narrow the
+  pathspec, not to add a rule.
+
+One `shgd replace` covers a whole `sed` script's worth of substitutions, so do not chain
+them. The five-expression `sed` line that motivated this verb — backtick-wrapped forms
+first, then bare, then `\b`-anchored — was three redundant rules: `--word` already
+covers every wrapping, because a backtick is not a word character.
 
 ### Conflicts
 - `shgd conflicts` — list conflicted files with hunk counts
@@ -130,18 +161,27 @@ those `awk` scripts corrupted files. `--take` never stages.
 
 ## Writes
 
-Only `--take` writes. Writes are **enabled by default**; the rationale is the same as
+Only `--take` writes — on `conflicts` and on `replace`, the same flag both times, so a
+verb without it is inspection. A step carrying `--take` is refused inside `batch`,
+which is exactly why `shgd replace` previews by default: the preview composes, the
+rewrite stands alone. Writes are **enabled by default**; the rationale is the same as
 `acceptEdits` mode — git holds the pre-change content, so a bad rewrite is recoverable
 (`git checkout -m -- <file>` even regenerates conflict markers).
 
 Because that rationale does *not* cover untracked files or uncommitted modifications,
 every write first copies the current file to
-`SHGD_TMP/backups/<timestamp>__<flattened-path>` and prints that path.
+`SHGD_TMP/backups/<timestamp>/<repo-relative-path>` and prints that path.
 
 Disable with `--no-write` or `SHGD_WRITE=0`. Writes are refused outside the repo and
-under `.git`, `.claude`, `.vscode`, `.idea`, `.husky`, `.cargo`, `.devcontainer`,
-`.yarn`, `.mvn`, `node_modules`, and for files like `.gitconfig` / `.npmrc` /
-`.mcp.json`. `shgd` never stages, commits, pushes, or deletes.
+under `.git`, `.github`, `.claude`, `.vscode`, `.idea`, `.husky`, `.cargo`,
+`.devcontainer`, `.yarn`, `.mvn`, `node_modules`, and for files like `.gitconfig` /
+`.npmrc` / `.mcp.json` / `package.json` / `.shgd.json` and the lockfiles — the manifests are
+protected because `shgd check` runs whatever they declare, so rewriting one would make
+the next `shgd check` arbitrary execution. `shgd` never stages, commits, pushes, or deletes.
+
+"Outside the repo" is decided on the **resolved** path, so a symlink or a Windows
+junction pointing out of the tree is refused for reads as well as writes — including
+one a pathspec sweep found, since `git ls-files` walks into it.
 
 Run `shgd where` to see the repo root, tmp dir, and current write state.
 
@@ -152,12 +192,18 @@ verb is pre-approved. A new verb must not push, delete, stage, or run caller-sup
 code. **Never add a verb that takes a program name, script path or shell string as an
 argument**; that converts one allow rule into an unrestricted shell.
 
-- Route any file write through `writeRepoFile` in `Tools/shgd/lib/writeGuard.ts`.
+- Route any file write through `writeRepoFile` in `Tools/shgd/lib/writeGuard.ts`, and
+  any read of a caller-named path through `readRepoText` in `lib/repoFile.ts`. A bare
+  `readFileSync` re-opens the read-outside-the-repo hole; a bare `writeFileSync`
+  silently defeats the write guard.
 - Validate any caller-supplied git ref or pathspec with `assertSafeGitArgument` in
   `lib/gitArgs.ts` — `runGit` is shell-free, but `git diff --output=<file>` still writes.
 - Anything caller-supplied that reaches `runTool` needs an allowlist grammar first —
-  `runTool` uses a shell on Windows. See `assertWorkspaceName` in `lib/gatePlan.ts`,
-  which is why `--project` can accept a directory name at all.
+  `runTool` uses a shell on Windows and Node quotes nothing there. See
+  `assertWorkspaceName`/`assertTestPath` in `lib/gatePlan.ts` and `assertShellSafeRef`
+  in `lib/gitArgs.ts`. `runTool` re-checks every argument against
+  `assertShellSafeArguments`, so a forgotten grammar is a refusal rather than a shell
+  — do not weaken that backstop to make an argument fit.
 - Return a `VerbResult` (`{lines, code}`); never `console.log`. Printing belongs to
   `index.ts`, and a printing verb is invisible to shaping and to `batch`.
 - Register any new `--flag`/`--key=` in `KnownFlags`/`KnownOptions` (`lib/constants.ts`)
