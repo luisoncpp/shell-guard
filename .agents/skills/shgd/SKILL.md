@@ -2,7 +2,7 @@
 
 name: shgd
 
-description: Use when you need to search, inspect git state or files, run the project's quality gates, get a fallow quality report, branch churn numbers, resolve merge conflicts, or run several repo commands in one round-trip. Read this BEFORE composing any shell line containing a for-loop, command substitution, `awk`, `sed -i`, or inline `node -e`/`python -c` against this repo — no allow rule can name those shapes, so they prompt every time, and `shgd` has a verb that replaces the job.
+description: Use when you need to run any shell command that don't modify anything outside the project. It can search, inspect git state or files, run the project's quality gates, get a fallow quality report, branch churn numbers, resolve merge conflicts, or run several repo commands in one round-trip. Read this BEFORE composing any shell line containing a for-loop, command substitution, `awk`, `sed -i`, or inline `node -e`/`python -c` against this repo — no allow rule can name those shapes, so they prompt every time, and `shgd` has a verb that replaces the job.
 
 argument-hint: "verb (batch | grep | each | read | section | status | diff | history | show | check | fallow | diffstat | conflicts)"
 

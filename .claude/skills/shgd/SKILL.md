@@ -4,7 +4,7 @@ name: shgd
 
 description: Use when you need to search, inspect git state or files, rename an identifier or substitute text across many files, run the project's quality gates, get a fallow quality report, branch churn numbers, resolve merge conflicts, or run several repo commands in one round-trip. Read this BEFORE composing any shell line containing a for-loop, command substitution, `awk`, `sed -i`, or inline `node -e`/`python -c` against this repo — no allow rule can name those shapes, so they prompt every time, and `shgd` has a verb that replaces the job.
 
-argument-hint: "verb (batch | grep | each | read | section | replace | status | diff | history | show | check | fallow | diffstat | conflicts)"
+argument-hint: "verb (batch | grep | each | read | section | replace | status | diff | history | show | ignored | check | fallow | diffstat | conflicts)"
 
 \---
 
@@ -197,6 +197,20 @@ rather than silently running something else.
 &#x20; This is how you find a file that no longer exists.
 
 \- `shgd show <ref>:<path>` — a file's contents at a revision.
+
+\- `shgd ignored <path> \[path...]` — `git check-ignore`: is the path gitignored, and
+
+&#x20; which file, line and pattern decided it. Grepping `.gitignore` does \*\*not\*\* answer
+
+&#x20; this — the rule can live in a nested `.gitignore`, `.git/info/exclude` or the global
+
+&#x20; `core.excludesFile`, and a later negation can overturn an earlier match. Every queried
+
+&#x20; path gets an explicit verdict, and nothing ignored is exit 0, not exit 1.
+
+&#x20; A \*\*tracked\*\* path always comes back "not ignored"; `--no-index` names the rule that
+
+&#x20; would have matched, which is how you debug a file `git add` picked up unexpectedly.
 
 
 

@@ -1,6 +1,6 @@
 // @Architecture(type=Module, descriptionShort="shgd CLI entry: argv parse, verb dispatch, output shaping", descriptionLong="Parses argv into flags/options/positionals/pathspecs, dispatches to one verb from a frozen table, then applies head/tail/grep/max-cols shaping to the lines the verb returned. Verbs never print; this is the only place output reaches stdout, which is what lets batch relabel and concatenate them. Thrown errors map to exit 1, an unknown verb to exit 2.")
 import { assertKnownKeys, parseArgs, type ParsedArgs } from './lib/argv';
-import { KnownFlags, KnownOptions } from './lib/constants';
+import { KnownFlags, KnownOptions, ShgdVersion } from './lib/constants';
 import { parseShaping, shapeLines } from './lib/outputShaping';
 import { Usage } from './lib/usage';
 import { isWriteEnabled } from './lib/writeGuard';
@@ -53,6 +53,7 @@ function runVerb(verb: string, args: ParsedArgs): VerbResult {
   const handler = Verbs[verb];
   if (!handler) throw new Error(`unknown verb "${verb}"`);
   assertKnownKeys(args, KnownFlags, KnownOptions);
+  if (args.flags.has('version')) return ok([ShgdVersion]);
   return handler(args);
 }
 
@@ -70,6 +71,10 @@ function main(): number {
   const [verb, ...rest] = argv;
   if (!verb || verb === 'help' || verb === '--help') {
     console.log(Usage);
+    return 0;
+  }
+  if (verb === 'version' || verb === '--version') {
+    console.log(ShgdVersion);
     return 0;
   }
   if (!Verbs[verb]) {

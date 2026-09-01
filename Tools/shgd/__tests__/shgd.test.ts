@@ -439,6 +439,23 @@ describe("shgd ignored end to end", () => {
 });
 
 describe("shgd dispatch", () => {
+  const ExpectedVersion = JSON.parse(
+    readFileSync(path.join(RepoRoot, "Tools", "shgd", "package.json"), "utf8"),
+  ).version as string;
+
+  it("prints the package.json version on --version and exits 0", () => {
+    const result = runCli(["--version"]);
+    expect(result.status).toBe(0);
+    expect(result.output.trim()).toBe(ExpectedVersion);
+  });
+
+  it("accepts --version after a verb without running the verb", () => {
+    const result = runCli(["check", "--version"]);
+    expect(result.status).toBe(0);
+    expect(result.output.trim()).toBe(ExpectedVersion);
+    expect(result.output).not.toContain("tsc");
+  });
+
   it("reports usage and exit 2 for an unknown verb", () => {
     const result = runCli(["bogus"]);
     expect(result.status).toBe(2);

@@ -67,7 +67,7 @@ Paths are relative to this directory.
 
 | File | Responsibility |
 |------|----------------|
-| `index.ts` | Verb table, dispatch, unknown-key rejection, output shaping, printing; thrown error → exit 1, unknown verb → exit 2. `--no-write` sets `SHGD_NO_WRITE` before any verb runs |
+| `index.ts` | Verb table, dispatch, unknown-key rejection, output shaping, printing; thrown error → exit 1, unknown verb → exit 2. `--version` prints `ShgdVersion` and exits. `--no-write` sets `SHGD_NO_WRITE` before any verb runs |
 | `lib/argv.ts` | **Pure.** `parseArgs` → `{flags, options, positional, paths}`; `assertKnownKeys`, `numericOption`, `compileRegExp` |
 | `lib/verb.ts` | The `VerbResult`/`VerbHandler`/`StepDispatch` contract. Its own module so verbs never import `index.ts` |
 | `lib/outputShaping.ts` | **Pure.** `shapeLines` (grep → maxCols → head → tail), `capLines` |
@@ -85,7 +85,7 @@ Paths are relative to this directory.
 | `lib/redaction.ts` | **Pure.** `redactLine`: connection-string passwords, bearer tokens, secret-looking assignment values (bare or JSON-quoted); `redactLines` also masks PEM key bodies, which no per-line rule can spot |
 | `lib/sectionSlice.ts` | **Pure.** `sliceSection`, inclusive of both boundaries like `sed -n '/a/,/b/p'` |
 | `lib/usage.ts` | Usage text only, kept out of `index.ts` so the entry point stays scannable |
-| `lib/constants.ts` | Frozen tunables: `Limits`, `ExpectedFallowSchemaVersion`, `DefaultDiffBase`, `ConflictMarkers`, `SourceExtensions`, `KnownFlags`, `KnownOptions` |
+| `lib/constants.ts` | Frozen tunables: `ShgdVersion`, `Limits`, `ExpectedFallowSchemaVersion`, `DefaultDiffBase`, `ConflictMarkers`, `SourceExtensions`, `KnownFlags`, `KnownOptions` |
 | `lib/conflictResolver.ts` | **Pure.** `classifyLine` marker state machine, `countHunks`, `resolveLines`, `parseSpec` |
 | `lib/diffCounting.ts` | **Pure.** `countSubstantiveLines(diffText)`, `parseNumstat`, `rankByChurn`, `totalChurn`, `isCountableSource` |
 | `lib/fallowReport.ts` | **Pure.** `reduceAudit`/`reduceDupes`/`deadCodeLines`/`newGroupLines` → printable lines + pass/fail, `schemaWarning`, `parseSection` |

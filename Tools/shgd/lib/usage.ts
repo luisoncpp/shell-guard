@@ -1,6 +1,8 @@
 // @Architecture(type=Module, descriptionShort="shgd usage text", descriptionLong="Held apart from index.ts purely so the entry point stays short enough to read at a glance as the verb surface grows. No logic.")
 export const Usage = `shgd — repo inspection + conflict resolution
 
+  shgd --version                       print the tool version (also: shgd version)
+
 Batching
   shgd batch "<step>" "<step>" ...     run several verbs in ONE invocation
                                      --stop-on-fail halts after the first failure
@@ -40,6 +42,33 @@ Gates and quality
                                      --section=complexity|dead-exports|all
                                      dupes --baseline=<file> shows only new groups
   shgd diffstat [base]                 churn vs base...HEAD plus source-line counts
+
+Custom gates — commit a .shgd.json (hand-edit; the file is write-protected)
+  Root .shgd.json replaces the default Node table (tsc / lint / jest). Omit it
+  to keep that table. <dir>/.shgd.json is used with --project=<dir>. A present
+  but invalid file is refused, not a silent fallback. schemaVersion is 1.
+
+  Each gate: unique name (/^[A-Za-z][A-Za-z0-9_-]*$/, what --only= matches),
+  command, args (one argv token per string; empty ok), inQuickRun (boolean).
+  command is a PATH basename (clang-tidy, lizard, npm, npx) or a repo-relative
+  file (Tools/RunTests.sh). No absolute paths, no \${ENV}, no shells
+  (bash/cmd/pwsh), no first arg -c/-e/--eval/-Command. Optional role "test"
+  (at most one) is the gate that receives --test=<path>. Order is run order;
+  --quick keeps inQuickRun: true and skips the rest.
+
+  Optional at file level: diffBase (fallow/diffstat/history; default
+  origin/develop), sourceExtensions (diffstat suffixes, e.g. ".cpp" ".h").
+
+  Example:
+    { "schemaVersion": 1,
+      "diffBase": "origin/main",
+      "sourceExtensions": [".h", ".cpp"],
+      "gates": [
+        { "name": "tidy", "command": "clang-tidy",
+          "args": ["-p", "compile_commands.json"], "inQuickRun": true },
+        { "name": "tests", "command": "Tools/RunTests.sh",
+          "args": [], "inQuickRun": false, "role": "test" }
+      ] }
 
 Conflicts
   shgd conflicts                       list conflicted files with hunk counts

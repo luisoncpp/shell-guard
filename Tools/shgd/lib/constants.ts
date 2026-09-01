@@ -1,4 +1,7 @@
-// @Architecture(type=Module, descriptionShort="All shgd tunables as frozen objects", descriptionLong="Single place for limits, the pinned fallow schema version, the default diff base, conflict marker strings and source extensions. Kept dependency-free so the pure logic modules can import it without pulling in any IO.")
+// @Architecture(type=Module, descriptionShort="All shgd tunables as frozen objects", descriptionLong="Single place for the CLI version string, limits, the pinned fallow schema version, the default diff base, conflict marker strings and source extensions. Kept dependency-free so the pure logic modules can import it without pulling in any IO.")
+/** Tool version printed by `--version`. Keep in lockstep with `package.json`. */
+export const ShgdVersion = '2026-09-01';
+
 export const Limits = Object.freeze({
   MaxOutputBytes: 32 * 1024 * 1024,
   TailLines: 15,
@@ -36,7 +39,7 @@ export const SourceExtensions = Object.freeze(['.ts', '.tsx', '.mts', '.cts', '.
 export const KnownFlags: ReadonlySet<string> = new Set([
   'audit', 'cached', 'cat', 'commits', 'count', 'count-lines', 'files-only', 'first-line',
   'help', 'list', 'name-status', 'no-index', 'no-write', 'numstat', 'patch', 'quick', 'redact', 'regex',
-  'show', 'stat', 'stop-on-fail', 'take', 'untracked', 'word',
+  'show', 'stat', 'stop-on-fail', 'take', 'untracked', 'version', 'word',
 ]);
 
 export const KnownOptions: ReadonlySet<string> = new Set([

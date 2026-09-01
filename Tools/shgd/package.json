@@ -1,10 +1,14 @@
 {
   "name": "shgd",
-  "version": "1.0.0",
+  "version": "2026-09-01",
   "private": true,
   "type": "module",
   "description": "Self-contained shgd toolbelt. Drop this folder into a repo and run `npm install` inside it once; nothing outside Tools/shgd is touched.",
+  "scripts": {
+    "compile": "bun build --compile ./index.ts --outfile dist/shgd"
+  },
   "devDependencies": {
+    "bun": "^1.4.0",
     "tsx": "^4.19.2"
   }
 }
