@@ -1,5 +1,6 @@
 // @Architecture(type=Module, descriptionShort="shgd CLI entry: argv parse, verb dispatch, output shaping", descriptionLong="Parses argv into flags/options/positionals/pathspecs, dispatches to one verb from a frozen table, then applies head/tail/grep/max-cols shaping to the lines the verb returned. Verbs never print; this is the only place output reaches stdout, which is what lets batch relabel and concatenate them. Thrown errors map to exit 1, an unknown verb to exit 2.")
 import { assertKnownKeys, parseArgs, type ParsedArgs } from './lib/argv';
+import { applyChangeDirectory } from './lib/changeDirectory';
 import { KnownFlags, KnownOptions, ShgdVersion } from './lib/constants';
 import { parseShaping, shapeLines } from './lib/outputShaping';
 import { Usage } from './lib/usage';
@@ -68,7 +69,7 @@ function main(): number {
   // leading -- is dropped; a later one still opens the pathspec list.
   const argv = process.argv.slice(2);
   if (argv[0] === '--') argv.shift();
-  const [verb, ...rest] = argv;
+  const [verb, ...rest] = applyChangeDirectory(argv);
   if (!verb || verb === 'help' || verb === '--help') {
     console.log(Usage);
     return 0;
