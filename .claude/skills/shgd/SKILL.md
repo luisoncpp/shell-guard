@@ -185,6 +185,8 @@ one a pathspec sweep found, since `git ls-files` walks into it.
 
 Run `shgd where` to see the repo root, tmp dir, and current write state.
 
+To inspect another worktree, put `-C <dir>` before the verb (`shgd -C <dir> status`), like `git -C`. It is repeatable, relative dirs chain, and it must come first.
+
 ## Adding a verb
 
 Keep the surface small and auditable — a broad `Bash(shgd:*)` allow rule means every

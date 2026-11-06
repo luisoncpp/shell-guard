@@ -2,6 +2,8 @@
 export const Usage = `shgd — repo inspection + conflict resolution
 
   shgd --version                       print the tool version (also: shgd version)
+  shgd -C <dir> <verb> ...             run the verb as if started in <dir> (like git -C);
+                                     repeatable, relative dirs chain; must come first
 
 Batching
   shgd batch "<step>" "<step>" ...     run several verbs in ONE invocation
